@@ -3,6 +3,7 @@ import { api, type CardView, type DeckDetail } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
 import { ImportModal } from '../components/ImportModal.tsx';
+import { Icon } from '../components/icons.tsx';
 import { ClaudeLoader, EmptyState, MasteryBar, Modal, Spinner, TierChip } from '../components/ui.tsx';
 
 const EMOJIS = ['📘', '🧬', '🧪', '🧮', '🌍', '🏛️', '💻', '🎨', '🎵', '⚖️', '🩺', '📈', '🗣️', '🔭', '🧠', '📜'];
@@ -57,7 +58,7 @@ export function DeckPage({ id }: { id: string }) {
     setEnhancing(true);
     try {
       const r = await api.enhance(d.id);
-      toast({ icon: '🧠', title: `Claude wrote quiz options for ${r.updated} cards`, kind: 'success' });
+      toast({ title: `Claude wrote quiz options for ${r.updated} cards`, kind: 'success' });
       await load();
     } catch (e) {
       showError(e);
@@ -108,9 +109,9 @@ export function DeckPage({ id }: { id: string }) {
   return (
     <div className="page">
       <button className="link back" onClick={() => navigate('/')}>
-        ← All decks
+        <Icon name="back" size={14} /> All decks
       </button>
-      <section className="deck-hero" style={{ ['--deck' as string]: d.color }}>
+      <section className="deck-hero">
         <div className="deck-hero-main">
           <details className="emoji-picker">
             <summary className="deck-hero-emoji">{d.emoji}</summary>
@@ -154,52 +155,55 @@ export function DeckPage({ id }: { id: string }) {
                 <b>{Math.round(d.mastery * 100)}%</b> mastered
               </span>
             </div>
-            <MasteryBar tiers={tiers} height={12} />
+            <MasteryBar tiers={tiers} height={6} />
           </div>
         </div>
 
         <div className="modes">
           <button className="mode-btn primary" disabled={!enough} onClick={() => navigate(`/play/quiz/${d.id}`)}>
-            <span className="mode-icon">🎯</span>
             <span className="mode-name">Quiz</span>
             <span className="mode-desc">{d.dueCount + d.newCount > 0 ? `${d.dueCount} due · ${d.newCount} new` : 'Practice ahead'}</span>
           </button>
           <button className="mode-btn" disabled={!enough} onClick={() => navigate(`/play/flashcards/${d.id}`)}>
-            <span className="mode-icon">🃏</span>
             <span className="mode-name">Flashcards</span>
             <span className="mode-desc">Flip & self-rate</span>
           </button>
           <button className="mode-btn" disabled={d.cardCount < 3} onClick={() => navigate(`/play/match/${d.id}`)}>
-            <span className="mode-icon">🧩</span>
             <span className="mode-name">Match</span>
             <span className="mode-desc">Beat the clock</span>
           </button>
           <button className="mode-btn" disabled={d.cardCount < 4} onClick={() => navigate(`/play/timeattack/${d.id}`)}>
-            <span className="mode-icon">⏱️</span>
             <span className="mode-name">Time Attack</span>
             <span className="mode-desc">60-second blitz</span>
           </button>
           <button className="mode-btn boss" disabled={!d.bossReady} onClick={() => navigate(`/play/boss/${d.id}`)}>
-            <span className="mode-icon">⚔️</span>
             <span className="mode-name">Boss Fight</span>
-            <span className="mode-desc">{d.bossReady ? 'Your hardest cards' : `🔒 Study ${data.bossMinCards}+ cards`}</span>
+            <span className="mode-desc">
+              {d.bossReady ? (
+                'Your hardest cards'
+              ) : (
+                <>
+                  <Icon name="lock" size={12} /> Study {data.bossMinCards}+ cards
+                </>
+              )}
+            </span>
           </button>
         </div>
       </section>
 
       <div className="tabs">
         <button className={`tab ${tab === 'cards' ? 'active' : ''}`} onClick={() => setTab('cards')}>
-          🃏 Cards ({data.cards.length})
+          Cards <span className="num">{data.cards.length}</span>
         </button>
         <button className={`tab ${tab === 'materials' ? 'active' : ''}`} onClick={() => setTab('materials')}>
-          📚 Materials ({data.materials.length})
+          Materials <span className="num">{data.materials.length}</span>
         </button>
         <div className="grow" />
-        <button className="btn" onClick={() => setImporting(true)}>
-          ✨ Add material
+        <button className="btn ghost" onClick={() => setEditing('new')}>
+          <Icon name="plus" /> Card
         </button>
-        <button className="btn" onClick={() => setEditing('new')}>
-          ＋ Card
+        <button className="btn" onClick={() => setImporting(true)}>
+          <Icon name="plus" /> Add material
         </button>
       </div>
 
@@ -215,7 +219,7 @@ export function DeckPage({ id }: { id: string }) {
                     {missingOptions} card{missingOptions === 1 ? '' : 's'} have no multiple-choice options yet.
                   </span>
                   <button className="btn small primary" onClick={() => void enhance()}>
-                    🧠 Make quiz options with Claude
+                    Write quiz options with Claude
                   </button>
                 </>
               )}
@@ -223,9 +227,9 @@ export function DeckPage({ id }: { id: string }) {
           )}
           {data.cards.length > 6 && <input className="input search" placeholder="Search cards…" value={query} onChange={(e) => setQuery(e.target.value)} />}
           {data.cards.length === 0 ? (
-            <EmptyState icon="📭" title="This deck is empty">
+            <EmptyState title="This deck is empty">
               <button className="btn primary" onClick={() => setImporting(true)}>
-                ✨ Generate cards from material
+                Generate cards from material
               </button>
             </EmptyState>
           ) : (
@@ -243,13 +247,15 @@ export function DeckPage({ id }: { id: string }) {
                   </div>
                   <div className="card-row-actions">
                     <button className="icon-btn" title="Ask Claude about this card" onClick={() => setExplaining(c)}>
-                      💬
+                      <Icon name="chat" />
                     </button>
-                    <button className="icon-btn" title={c.starred ? 'Unstar' : 'Star'} onClick={() => void cardAction(c, 'star')}>
-                      {c.starred ? '⭐' : '☆'}
+                    <button className={`icon-btn ${c.starred ? 'on' : ''}`} title={c.starred ? 'Unstar' : 'Star'} onClick={() => void cardAction(c, 'star')}>
+                      <Icon name="star" filled={c.starred} />
                     </button>
                     <details className="menu">
-                      <summary className="icon-btn">⋯</summary>
+                      <summary className="icon-btn" title="More">
+                        <Icon name="more" />
+                      </summary>
                       <div className="menu-items">
                         <button onClick={() => setEditing(c)}>Edit</button>
                         <button onClick={() => void cardAction(c, 'suspend')}>{c.suspended ? 'Resume' : 'Pause'}</button>
@@ -270,7 +276,7 @@ export function DeckPage({ id }: { id: string }) {
       {tab === 'materials' && (
         <div className="card-list">
           {data.materials.length === 0 && (
-            <EmptyState icon="📚" title="No materials yet">
+            <EmptyState title="No materials yet">
               <p className="muted">Add PDFs, notes, links or topics. Each one adds new cards to this deck.</p>
             </EmptyState>
           )}
@@ -278,7 +284,8 @@ export function DeckPage({ id }: { id: string }) {
             <div key={m.id} className="card-row">
               <div className="card-row-main">
                 <div className="card-front">
-                  {{ text: '📝', file: '📄', url: '🔗', topic: '💭', import: '📥' }[m.kind]} {m.title}
+                  <span className="chip">{{ text: 'Notes', file: 'File', url: 'Link', topic: 'Topic', import: 'List' }[m.kind]}</span>
+                  {m.title}
                 </div>
                 <div className="card-back muted">{m.preview}</div>
               </div>
@@ -301,7 +308,7 @@ export function DeckPage({ id }: { id: string }) {
                     }
                   }}
                 >
-                  🗑️
+                  <Icon name="trash" />
                 </button>
               </div>
             </div>

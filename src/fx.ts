@@ -1,6 +1,12 @@
 // Visual effects: confetti bursts and floating score text.
 
-const COLORS = ['#7c5cff', '#22d3ee', '#f472b6', '#fbbf24', '#34d399', '#fb7185'];
+/** Confetti uses the theme accent and the text color only. */
+function themeColors(): string[] {
+  const css = getComputedStyle(document.documentElement);
+  const accent = css.getPropertyValue('--accent').trim() || '#7aa2f7';
+  const text = css.getPropertyValue('--text').trim() || '#e8e8eb';
+  return [accent, accent, text];
+}
 
 export function confetti(amount = 140, origin?: { x: number; y: number }) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -10,6 +16,7 @@ export function confetti(amount = 140, origin?: { x: number; y: number }) {
   canvas.height = window.innerHeight;
   document.body.appendChild(canvas);
   const g = canvas.getContext('2d')!;
+  const colors = themeColors();
   const ox = origin?.x ?? canvas.width / 2;
   const oy = origin?.y ?? canvas.height / 3;
   const parts = Array.from({ length: amount }, () => {
@@ -20,11 +27,11 @@ export function confetti(amount = 140, origin?: { x: number; y: number }) {
       y: oy,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 6,
-      w: 6 + Math.random() * 6,
-      h: 4 + Math.random() * 4,
+      w: 4 + Math.random() * 4,
+      h: 2 + Math.random() * 2,
       r: Math.random() * Math.PI,
       vr: (Math.random() - 0.5) * 0.3,
-      c: COLORS[Math.floor(Math.random() * COLORS.length)],
+      c: colors[Math.floor(Math.random() * colors.length)],
     };
   });
   const start = performance.now();
@@ -52,7 +59,7 @@ export function confetti(amount = 140, origin?: { x: number; y: number }) {
 }
 
 /** Float a short label (e.g. "+14 XP") up from an element or point. */
-export function floatText(text: string, at: HTMLElement | { x: number; y: number } | null, color = 'var(--accent2)') {
+export function floatText(text: string, at: HTMLElement | { x: number; y: number } | null, color = 'var(--text)') {
   let x = window.innerWidth / 2;
   let y = window.innerHeight / 2;
   if (at instanceof HTMLElement) {

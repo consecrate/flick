@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { SHOP } from '../../shared/game.ts';
-import type { Settings as SettingsT } from '../../shared/types.ts';
+import { MODEL_PRESETS, isValidModel, type ModelChoice, type Settings as SettingsT } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useApp, useAppState } from '../app-context.tsx';
 import { Spinner } from '../components/ui.tsx';
@@ -30,7 +30,8 @@ export function Settings() {
     setTesting(true);
     try {
       const r = await api.testClaude();
-      toast({ icon: '✅', title: 'Claude is connected', body: `${r.message} (${(r.durationMs / 1000).toFixed(1)}s)`, kind: 'success' });
+      const used = r.models.length ? ` via ${r.models.join(', ')}` : '';
+      toast({ title: 'Claude is connected', body: `${r.message} (${(r.durationMs / 1000).toFixed(1)}s${used})`, kind: 'success' });
     } catch (e) {
       showError(e);
     } finally {
@@ -43,7 +44,7 @@ export function Settings() {
     try {
       await api.importBackup(JSON.parse(await file.text()));
       await refresh();
-      toast({ icon: '📦', title: 'Backup restored', kind: 'success' });
+      toast({ title: 'Backup restored', kind: 'success' });
     } catch (e) {
       showError(e);
     }
@@ -86,21 +87,18 @@ export function Settings() {
         <p className="small">
           CLI: {health ? health.claude ? <code>{health.claude}</code> : <span className="bad-text">not found. Install Claude Code and run `claude` once to log in.</span> : <Spinner />}
         </p>
-        <label className="field">
-          <span>Model for writing cards & tutoring</span>
-          <select className="input" value={st.model} onChange={(e) => void set({ model: e.target.value as SettingsT['model'] })}>
-            <option value="haiku">Haiku: fastest, lightest on usage limits</option>
-            <option value="sonnet">Sonnet: balanced (recommended)</option>
-            <option value="opus">Opus: best quality, uses the most of your limits</option>
-          </select>
-        </label>
+        <ModelPicker label="Model for writing cards & tutoring" value={st.model} onChange={(model) => void set({ model })} />
+        <ModelPicker label="Model for checking typed answers & appeals" value={st.gradingModel} onChange={(gradingModel) => void set({ gradingModel })} />
+        <p className="muted small">
+          Pick a preset or enter any model name Claude Code accepts with <code>--model</code>, such as a full ID like <code>claude-sonnet-5-5</code>. A fast
+          model keeps answer checks to a few seconds.
+        </p>
         <label className="check">
           <input type="checkbox" checked={st.thinking} onChange={(e) => void set({ thinking: e.target.checked })} />
           <span>Let Claude think before writing cards (about 3× slower, sometimes better cards)</span>
         </label>
-        <p className="muted small">Answer appeals always use Haiku so they come back in a few seconds.</p>
         <button className="btn" disabled={testing} onClick={() => void test()}>
-          {testing ? <Spinner /> : '🔌'} Test connection
+          {testing && <Spinner />} Test connection
         </button>
       </div>
 
@@ -152,15 +150,69 @@ export function Settings() {
         </p>
         <div className="row">
           <a className="btn" href="/api/export" download>
-            ⬇ Export backup
+            Export backup
           </a>
           <button className="btn" onClick={() => fileRef.current?.click()}>
-            ⬆ Restore backup
+            Restore backup
           </button>
           <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && void restore(e.target.files[0])} />
         </div>
       </div>
     </div>
+  );
+}
+
+const CUSTOM = '__custom';
+
+function ModelPicker({ label, value, onChange }: { label: string; value: ModelChoice; onChange: (m: ModelChoice) => void }) {
+  const isPreset = MODEL_PRESETS.some((p) => p.value === value);
+  const [custom, setCustom] = useState(!isPreset);
+  const [draft, setDraft] = useState(isPreset ? '' : value);
+  const trimmed = draft.trim();
+  const valid = isValidModel(trimmed);
+
+  const commit = () => {
+    if (valid && trimmed !== value) onChange(trimmed);
+  };
+
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select
+        className="input"
+        value={custom ? CUSTOM : value}
+        onChange={(e) => {
+          if (e.target.value === CUSTOM) {
+            setCustom(true);
+          } else {
+            setCustom(false);
+            onChange(e.target.value);
+          }
+        }}
+      >
+        {MODEL_PRESETS.map((p) => (
+          <option key={p.value} value={p.value}>
+            {p.label}
+          </option>
+        ))}
+        <option value={CUSTOM}>Custom model ID…</option>
+      </select>
+      {custom && (
+        <span className="row">
+          <input
+            className="input"
+            placeholder="e.g. claude-sonnet-5-5"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && commit()}
+          />
+          <button className="btn" type="button" disabled={!valid || trimmed === value} onClick={commit}>
+            Use
+          </button>
+        </span>
+      )}
+      {custom && trimmed && !valid && <span className="bad-text small">Use only letters, digits, dots, dashes and underscores.</span>}
+    </label>
   );
 }
 

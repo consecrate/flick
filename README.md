@@ -11,7 +11,7 @@ Flick has no API key and no separate account. The local server runs the `claude`
 - `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` are removed from the child process environment so Claude Code can't fall back to billing an API key. Set `FLICK_ALLOW_API_KEY=1` if you *want* API billing.
 - Each call runs in an empty temp directory with `--strict-mcp-config`, `--no-session-persistence`, a Flick-specific system prompt and only the tools it needs: `Read` for uploaded files, `WebFetch` for links, otherwise none.
 - Extended thinking is off by default (`MAX_THINKING_TOKENS=0`), which makes generation about 3× faster. You can turn it on in Settings.
-- AI calls count toward your Claude usage limits like any other Claude Code use. Choose Haiku, Sonnet or Opus in Settings.
+- AI calls count toward your Claude usage limits like any other Claude Code use. Choose Haiku, Sonnet, Opus, Claude Code's own default model, or any custom model ID in Settings. Card writing and answer checking each have their own model setting.
 - The server listens on `127.0.0.1` only, because it can run Claude Code on your behalf.
 
 This is meant for personal use on your own machine.
@@ -55,7 +55,7 @@ Data lives in `~/.flick/data.json` (override with `FLICK_DATA_DIR`). Export and 
 
 ### Studying
 - **Quiz** (main mode): FSRS picks due cards first, then new cards up to your daily limit. New or shaky cards are asked as **multiple choice**. Once FSRS considers a card stable, it switches to **typed recall**. Missed cards come back once at the end of the session. You have 5 ❤️ per quiz, and can revive for coins.
-- **Typed answers** are checked locally first, tolerating typos, articles and listed alternatives. Near misses go to Claude (Haiku) for a judgement automatically. For any wrong answer you can press **"I was right: ask Claude"** to appeal; if you win, you get the XP and the heart back.
+- **Typed answers** are checked locally first, tolerating typos, articles and listed alternatives. Near misses go to Claude (the answer-checking model, Haiku by default) for a judgement automatically. For any wrong answer you can press **"I was right: ask Claude"** to appeal; if you win, you get the XP and the heart back.
 - **Flashcards**: flip and self-rate Again/Hard/Good/Easy, with FSRS interval previews on each button.
 - **Ask Claude**: a tutor chat on any card ("explain this", "give me a mnemonic"), available in feedback, in flashcards, and in the card list.
 

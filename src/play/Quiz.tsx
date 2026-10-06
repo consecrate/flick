@@ -4,6 +4,7 @@ import type { Reward } from '../../shared/types.ts';
 import { api, type CardView, type StudyData } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
+import { Icon } from '../components/icons.tsx';
 import { EmptyState, ProgressBar, Spinner } from '../components/ui.tsx';
 import { shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
@@ -182,7 +183,7 @@ function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
   if (phase === 'empty') {
     return (
       <div className="play">
-        <EmptyState icon="🎉" title="All caught up!">
+        <EmptyState title="All caught up">
           <p className="muted">FSRS says nothing is due right now. Coming back later is the most efficient way to remember.</p>
           <div className="row center-row">
             <button className="btn" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
@@ -204,7 +205,7 @@ function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
       <div className="play">
         <Results
           reward={reward}
-          title={t.correct === t.answers && t.answers >= 5 ? '💎 Flawless!' : 'Session complete!'}
+          title={t.correct === t.answers && t.answers >= 5 ? 'Flawless session' : 'Session complete'}
           subtitle={ahead ? 'Practiced ahead of schedule.' : undefined}
           deckId={deckId}
           stats={[
@@ -223,7 +224,6 @@ function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
     return (
       <div className="play">
         <div className="results">
-          <div className="big-emoji">💔</div>
           <h1>Out of hearts</h1>
           <p className="muted">Your progress so far is saved. Revive to finish the set, or wrap up here.</p>
           <div className="results-actions">
@@ -231,7 +231,7 @@ function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
               End session
             </button>
             <button className="btn primary big" disabled={s.profile.coins < REVIVE_COST} onClick={() => void revive()}>
-              ❤️ Revive for 🪙 {REVIVE_COST}
+              Revive for <Icon name="coin" /> {REVIVE_COST}
             </button>
           </div>
           {s.profile.coins < REVIVE_COST && <p className="muted small">You need {REVIVE_COST} coins to revive.</p>}

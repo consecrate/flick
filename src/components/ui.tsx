@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { MASTERY_TIERS } from '../../shared/game.ts';
-import { navigate, useAppState } from '../app-context.tsx';
+import { navigate, useAppState, useRoute } from '../app-context.tsx';
+import { Icon } from './icons.tsx';
 
 export function ProgressBar({ value, max = 1, color, height = 10, className = '' }: { value: number; max?: number; color?: string; height?: number; className?: string }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
@@ -47,8 +48,8 @@ export function Modal({ onClose, children, wide }: { onClose: () => void; childr
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal ${wide ? 'modal-wide' : ''}`} role="dialog" aria-modal="true">
-        <button className="modal-close" onClick={onClose} aria-label="Close">
-          ×
+        <button className="icon-btn modal-close" onClick={onClose} aria-label="Close">
+          <Icon name="x" />
         </button>
         {children}
       </div>
@@ -59,43 +60,55 @@ export function Modal({ onClose, children, wide }: { onClose: () => void; childr
 export function TopBar() {
   const s = useAppState();
   const p = s.profile;
+  const path = useRoute();
+  const link = (href: string, label: string) => {
+    const active = href === '/' ? path === '/' || path.startsWith('/deck') : path.startsWith(href);
+    return (
+      <a href={`#${href}`} aria-current={active ? 'page' : undefined}>
+        {label}
+      </a>
+    );
+  };
   return (
     <header className="topbar">
       <button className="brand" onClick={() => navigate('/')}>
-        <span className="brand-bolt">⚡</span> Flick
+        <span className="brand-mark">
+          <Icon name="bolt" size={14} filled />
+        </span>
+        Flick
       </button>
       <nav className="nav">
-        <a href="#/">Home</a>
-        <a href="#/stats">Stats</a>
-        <a href="#/achievements">Trophies</a>
-        <a href="#/shop">Shop</a>
-        <a href="#/settings">Settings</a>
+        {link('/', 'Decks')}
+        {link('/stats', 'Stats')}
+        {link('/achievements', 'Trophies')}
+        {link('/shop', 'Shop')}
+        {link('/settings', 'Settings')}
       </nav>
       <div className="hud">
         <span className={`hud-item ${s.streakAtRisk ? 'at-risk' : ''}`} title={s.streakAtRisk ? 'Study today to keep your streak!' : 'Day streak'}>
-          <span className={p.streak.current > 0 ? 'flame' : 'flame off'}>🔥</span> {p.streak.current}
+          <Icon name="flame" className={p.streak.current > 0 ? 'flame' : 'flame off'} /> <b>{p.streak.current}</b>
         </span>
         <span className="hud-item" title="Coins">
-          🪙 {p.coins}
+          <Icon name="coin" /> <b>{p.coins}</b>
         </span>
         <span className="hud-item" title="Hints">
-          💡 {p.hints}
+          <Icon name="hint" /> <b>{p.hints}</b>
         </span>
         {p.streak.freezes > 0 && (
           <span className="hud-item" title="Streak freezes">
-            🧊 {p.streak.freezes}
+            <Icon name="freeze" /> <b>{p.streak.freezes}</b>
           </span>
         )}
         {s.doubleXpActive && (
           <span className="hud-item boost" title="Double XP active">
-            🚀 2×
+            <b>2× XP</b>
           </span>
         )}
         <button className="hud-avatar" onClick={() => navigate('/settings')} title={`${p.name} · Level ${s.level.level}`}>
           <span className="avatar">{p.avatar}</span>
           <span className="hud-level">
-            <span className="small">Lv {s.level.level}</span>
-            <ProgressBar value={s.level.into} max={s.level.needed} height={5} />
+            <span>Lv {s.level.level}</span>
+            <ProgressBar value={s.level.into} max={s.level.needed} height={3} />
           </span>
         </button>
       </div>
@@ -117,7 +130,8 @@ export function MasteryBar({ tiers, height = 10 }: { tiers: number[]; height?: n
 export function TierChip({ tier }: { tier: number }) {
   const t = MASTERY_TIERS[tier];
   return (
-    <span className="chip" style={{ color: t.color, borderColor: t.color }}>
+    <span className="chip">
+      <span className="chip-dot" style={{ background: t.color }} />
       {t.name}
     </span>
   );
@@ -145,11 +159,11 @@ export function ClaudeLoader({ lines = LOADING_LINES }: { lines?: string[] }) {
   }, [lines.length]);
   return (
     <div className="loader">
-      <div className="loader-orb">
-        <span>✨</span>
-      </div>
+      <div className="loader-orb" />
       <p className="loader-line">{lines[i]}</p>
-      <p className="muted small">{secs}s · running on your Claude Code subscription</p>
+      <p className="muted small">
+        <span className="num">{secs}s</span> · running on your Claude Code subscription
+      </p>
     </div>
   );
 }
@@ -229,10 +243,10 @@ function inline(s: string): ReactNode[] {
   return out;
 }
 
-export function EmptyState({ icon, title, children }: { icon: string; title: string; children?: ReactNode }) {
+export function EmptyState({ icon, title, children }: { icon?: string; title: string; children?: ReactNode }) {
   return (
     <div className="empty">
-      <div className="empty-icon">{icon}</div>
+      {icon && <div className="empty-icon">{icon}</div>}
       <h3>{title}</h3>
       {children}
     </div>

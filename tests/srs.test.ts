@@ -4,6 +4,7 @@ import type { Settings } from '../shared/types.ts';
 
 const settings: Settings = {
   model: 'sonnet',
+  gradingModel: 'haiku',
   desiredRetention: 0.9,
   newPerDay: 20,
   sessionSize: 12,
