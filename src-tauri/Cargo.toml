@@ -1,0 +1,25 @@
+[package]
+name = "flick"
+version = "0.1.0"
+description = "Gamified AI flashcards"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+[lib]
+name = "flick_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]

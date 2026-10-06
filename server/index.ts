@@ -7,6 +7,7 @@ import { isValidModel, type Card, type Deck, type Material, type SessionComplete
 import { explainCard, generateCards, gradeAnswer, makeDistractors, parsePairs } from './ai.ts';
 import { ClaudeError, UPLOAD_DIR, callClaude, claudeVersion } from './claude.ts';
 import { DATA_DIR, db, replaceAll, save, uid, type Data } from './db.ts';
+import { setupDesktop } from './desktop.ts';
 import {
   BOSS_MIN_CARDS,
   aheadQueue,
@@ -20,6 +21,8 @@ import {
   summarizeDeck,
 } from './game.ts';
 import { isDue, newSrs, preview, retrievability } from './srs.ts';
+
+setupDesktop();
 
 const app = express();
 app.use(express.json({ limit: '60mb' }));
@@ -645,7 +648,7 @@ app.post(
 // ---------- static & errors ----------
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const dist = path.resolve(here, '..', 'dist');
+const dist = process.env.FLICK_UI_DIR ?? path.resolve(here, '..', 'dist');
 const serveUi = fs.existsSync(path.join(dist, 'index.html'));
 if (serveUi) {
   app.use(express.static(dist));

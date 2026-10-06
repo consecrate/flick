@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Flick</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0e0f11; color: #c9cbd1; font: 15px -apple-system, system-ui, sans-serif; }
+      body { display: grid; place-items: center; }
+      #error { display: none; max-width: 420px; padding: 24px; text-align: center; line-height: 1.5; }
+      #error code { color: #fff; }
+    </style>
+  </head>
+  <body>
+    <div id="error"></div>
+    <script>
+      // The app shows this page while the local Flick server starts, which
+      // normally takes a fraction of a second. On failure the app adds
+      // #error=<message> to the URL.
+      const m = location.hash.match(/^#error=(.*)$/);
+      if (m) {
+        const el = document.getElementById('error');
+        el.textContent = 'Flick could not start its local server: ' + decodeURIComponent(m[1]);
+        el.style.display = 'block';
+      }
+    </script>
+  </body>
+</html>
