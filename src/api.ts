@@ -100,7 +100,7 @@ export interface GenerateResult {
 
 export const api = {
   health: () => req<{ ok: boolean; claude: string | null; dataDir: string }>('GET', '/api/health'),
-  testClaude: () => req<{ message: string; durationMs: number }>('POST', '/api/claude/test'),
+  testClaude: () => req<{ message: string; durationMs: number; models: string[] }>('POST', '/api/claude/test'),
   state: () => req<AppState>('GET', '/api/state'),
   createDeck: (d: { title: string; emoji?: string; description?: string }) => req<DeckSummary>('POST', '/api/decks', d),
   deck: (id: string) => req<DeckDetail>('GET', `/api/decks/${id}`),
