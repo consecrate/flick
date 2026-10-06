@@ -7,9 +7,10 @@
   "scripts": {
     "dev": "concurrently -k -n server,web -c blue,magenta \"tsx watch server/index.ts\" \"vite\"",
     "build": "vite build",
-    "start": "NODE_ENV=production tsx server/index.ts",
+    "start": "vite build && tsx server/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "serve": "tsx server/index.ts"
   },
   "engines": {
     "node": ">=20"

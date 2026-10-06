@@ -81,7 +81,15 @@ export function applyAnswer(req: AnswerRequest): AnswerResult {
   }
 
   const xp = grantXp(
-    xpForAnswer({ correct: a.correct, isNew: isNew && req.scheduled, combo: a.combo, ms: a.ms, usedHint: a.usedHint, questionType: a.questionType }),
+    xpForAnswer({
+      correct: a.correct,
+      isNew: isNew && req.scheduled,
+      combo: a.combo,
+      ms: a.ms,
+      usedHint: a.usedHint,
+      questionType: a.questionType,
+      practice: !req.scheduled,
+    }),
     day,
   );
 

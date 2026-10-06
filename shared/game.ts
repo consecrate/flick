@@ -59,6 +59,8 @@ export interface XpInput {
   ms: number;
   usedHint?: boolean;
   questionType?: 'mcq' | 'typed' | 'flip';
+  /** Arcade answers (no scheduling) earn half XP so real reviews stay the best source. */
+  practice?: boolean;
 }
 
 export function xpForAnswer(a: XpInput): number {
@@ -68,6 +70,7 @@ export function xpForAnswer(a: XpInput): number {
   xp += Math.min(a.combo, 10);
   if (a.ms > 0 && a.ms < 5000) xp += 4;
   if (a.usedHint) xp = Math.ceil(xp / 2);
+  if (a.practice) xp = Math.ceil(xp / 2);
   return xp;
 }
 
@@ -145,7 +148,7 @@ const QUEST_POOL: QuestTemplate[] = [
   { kind: 'xp', targets: [100, 200, 300], label: (n) => `Earn ${n} XP`, reward: (n) => 10 + n / 10 },
   { kind: 'newCards', targets: [5, 10], label: (n) => `Learn ${n} new cards`, reward: (n) => 15 + n * 2 },
   { kind: 'flashcards', targets: [10, 20], label: (n) => `Rate ${n} cards in Flashcards`, reward: (n) => 10 + n },
-  { kind: 'sessions', targets: [2, 3], label: (n) => `Finish ${n} quiz sessions`, reward: (n) => 15 * n },
+  { kind: 'sessions', targets: [2, 3], label: (n) => `Finish ${n} study sessions (Quiz or Flashcards)`, reward: (n) => 15 * n },
   { kind: 'practice', targets: [1, 2], label: (n) => `Play ${n} arcade game${n > 1 ? 's' : ''} (Match, Time Attack, Boss)`, reward: (n) => 20 * n },
   { kind: 'perfect', targets: [1], label: () => 'Finish a quiz with no mistakes', reward: () => 40 },
 ];

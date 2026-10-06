@@ -139,6 +139,7 @@ app.get('/api/state', (req, res) => {
 
 app.post('/api/decks', (req, res) => {
   const deck = createDeck(String(req.body.title ?? ''), req.body.emoji, String(req.body.description ?? ''));
+  checkAchievements(db.profile);
   save();
   res.json(summarizeDeck(deck.id));
 });
@@ -269,7 +270,7 @@ app.post(
       const added = pairs.map((p) => addCard(deck!.id, p, mat.id));
       mat.cardCount = added.length;
       save();
-      res.json({ deck: summarizeDeck(deck.id), added: added.length, material: mat, needsDistractors: true });
+      res.json({ deck: summarizeDeck(deck.id), added: added.length, material: mat, needsDistractors: true, newAchievements: checkAchievements(db.profile) });
       return;
     }
 
@@ -330,8 +331,9 @@ app.post(
       const added = out.cards.map((c) => addCard(deck!.id, c, mat.id));
       mat.cardCount = added.length;
       db.profile.stats.aiGenerations++;
+      const newAchievements = checkAchievements(db.profile);
       save();
-      res.json({ deck: summarizeDeck(deck.id), added: added.length, material: mat, costUsd: out.costUsd });
+      res.json({ deck: summarizeDeck(deck.id), added: added.length, material: mat, costUsd: out.costUsd, newAchievements });
     } finally {
       for (const f of files) fs.rm(f.path, { force: true }, () => {});
     }
@@ -640,7 +642,8 @@ app.post(
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(here, '..', 'dist');
-if (process.env.NODE_ENV === 'production' && fs.existsSync(dist)) {
+const serveUi = fs.existsSync(path.join(dist, 'index.html'));
+if (serveUi) {
   app.use(express.static(dist));
   app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
@@ -660,5 +663,5 @@ const port = Number(process.env.FLICK_PORT ?? 4317);
 // Bound to localhost only: the server can run Claude Code on your behalf.
 app.listen(port, '127.0.0.1', () => {
   console.log(`\n  ⚡ Flick API on http://localhost:${port}  (data: ${DATA_DIR})`);
-  if (process.env.NODE_ENV === 'production') console.log(`  Open http://localhost:${port} to study.\n`);
+  if (serveUi) console.log(`  Open http://localhost:${port} to study.\n`);
 });
