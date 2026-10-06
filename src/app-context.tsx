@@ -61,11 +61,14 @@ export function useAppState(): AppState {
 
 function applyTheme(themeId: string) {
   const item = SHOP.find((i) => i.id === themeId) ?? SHOP.find((i) => i.id === 'theme-midnight')!;
-  const [bg, surface, accent] = item.value as string[];
+  const [bg, surface, accent, ink] = item.value as string[];
   const root = document.documentElement.style;
   root.setProperty('--bg', bg);
   root.setProperty('--surface', surface);
   root.setProperty('--accent', accent);
+  root.setProperty('--ink', ink);
+  // Light text means a dark theme; native controls and scrollbars follow.
+  root.setProperty('color-scheme', parseInt(ink.slice(1, 3), 16) > 128 ? 'dark' : 'light');
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {

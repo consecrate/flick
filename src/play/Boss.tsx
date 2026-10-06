@@ -76,7 +76,7 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
       setLastHit(null);
       sfx.hurt();
       shake(playerRef.current);
-      floatText('−1 heart', playerRef.current, 'var(--bad)');
+      floatText('−❤️', playerRef.current, 'var(--bad)');
       setHearts((h) => Math.max(0, h - 1));
     }
   };
@@ -110,7 +110,7 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
         {reward ? (
           <Results
             reward={reward}
-            title={result === 'won' ? `${boss.name} defeated` : `${boss.name} wins this round`}
+            title={result === 'won' ? `⚔️ ${boss.name} defeated!` : `${boss.emoji} ${boss.name} wins this round`}
             subtitle={result === 'won' ? 'Your hardest cards just got a little easier.' : 'Review these cards and come back stronger.'}
             deckId={deckId}
             stats={[
@@ -145,7 +145,7 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
               Flee
             </button>
             <button className="btn primary big" onClick={() => setIntro(false)}>
-              Fight
+              ⚔️ Fight!
             </button>
           </div>
         </div>
@@ -171,7 +171,7 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
               {hp} / {maxHp}
             </span>
           </div>
-          {lastHit?.crit && <div className="crit">Critical hit</div>}
+          {lastHit?.crit && <div className="crit">CRITICAL!</div>}
         </div>
         <ComboMeter combo={session.combo} />
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { MASTERY_TIERS } from '../../shared/game.ts';
 import { navigate, useAppState, useRoute } from '../app-context.tsx';
 import { Icon } from './icons.tsx';
+import { Mascot, type Mood } from './Mascot.tsx';
 
 export function ProgressBar({ value, max = 1, color, height = 10, className = '' }: { value: number; max?: number; color?: string; height?: number; className?: string }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
@@ -61,10 +62,13 @@ export function TopBar() {
   const s = useAppState();
   const p = s.profile;
   const path = useRoute();
-  const link = (href: string, label: string) => {
+  const link = (href: string, emoji: string, label: string) => {
     const active = href === '/' ? path === '/' || path.startsWith('/deck') : path.startsWith(href);
     return (
       <a href={`#${href}`} aria-current={active ? 'page' : undefined}>
+        <span className="nav-emoji" aria-hidden="true">
+          {emoji}
+        </span>
         {label}
       </a>
     );
@@ -73,42 +77,42 @@ export function TopBar() {
     <header className="topbar">
       <button className="brand" onClick={() => navigate('/')}>
         <span className="brand-mark">
-          <Icon name="bolt" size={14} filled />
+          <Icon name="bolt" size={20} filled />
         </span>
         Flick
       </button>
       <nav className="nav">
-        {link('/', 'Decks')}
-        {link('/stats', 'Stats')}
-        {link('/achievements', 'Trophies')}
-        {link('/shop', 'Shop')}
-        {link('/settings', 'Settings')}
+        {link('/', '🏠', 'Decks')}
+        {link('/stats', '📊', 'Stats')}
+        {link('/achievements', '🏆', 'Trophies')}
+        {link('/shop', '🛍️', 'Shop')}
+        {link('/settings', '⚙️', 'Settings')}
       </nav>
       <div className="hud">
         <span className={`hud-item ${s.streakAtRisk ? 'at-risk' : ''}`} title={s.streakAtRisk ? 'Study today to keep your streak!' : 'Day streak'}>
-          <Icon name="flame" className={p.streak.current > 0 ? 'flame' : 'flame off'} /> <b>{p.streak.current}</b>
+          <span className={p.streak.current > 0 ? 'flame' : 'flame off'}>🔥</span> <b>{p.streak.current}</b>
         </span>
         <span className="hud-item" title="Coins">
-          <Icon name="coin" /> <b>{p.coins}</b>
+          🪙 <b>{p.coins}</b>
         </span>
         <span className="hud-item" title="Hints">
-          <Icon name="hint" /> <b>{p.hints}</b>
+          💡 <b>{p.hints}</b>
         </span>
         {p.streak.freezes > 0 && (
           <span className="hud-item" title="Streak freezes">
-            <Icon name="freeze" /> <b>{p.streak.freezes}</b>
+            🧊 <b>{p.streak.freezes}</b>
           </span>
         )}
         {s.doubleXpActive && (
           <span className="hud-item boost" title="Double XP active">
-            <b>2× XP</b>
+            🚀 <b>2× XP</b>
           </span>
         )}
         <button className="hud-avatar" onClick={() => navigate('/settings')} title={`${p.name} · Level ${s.level.level}`}>
           <span className="avatar">{p.avatar}</span>
           <span className="hud-level">
             <span>Lv {s.level.level}</span>
-            <ProgressBar value={s.level.into} max={s.level.needed} height={3} />
+            <ProgressBar value={s.level.into} max={s.level.needed} height={6} />
           </span>
         </button>
       </div>
@@ -159,6 +163,7 @@ export function ClaudeLoader({ lines = LOADING_LINES }: { lines?: string[] }) {
   }, [lines.length]);
   return (
     <div className="loader">
+      <Mascot mood="wow" size={96} className="bob" />
       <div className="loader-orb" />
       <p className="loader-line">{lines[i]}</p>
       <p className="muted small">
@@ -243,9 +248,10 @@ function inline(s: string): ReactNode[] {
   return out;
 }
 
-export function EmptyState({ icon, title, children }: { icon?: string; title: string; children?: ReactNode }) {
+export function EmptyState({ icon, mood, title, children }: { icon?: string; mood?: Mood; title: string; children?: ReactNode }) {
   return (
     <div className="empty">
+      {mood && <Mascot mood={mood} size={110} />}
       {icon && <div className="empty-icon">{icon}</div>}
       <h3>{title}</h3>
       {children}
