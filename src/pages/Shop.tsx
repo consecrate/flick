@@ -1,8 +1,12 @@
 import { SHOP, type ShopItem } from '../../shared/game.ts';
 import { api } from '../api.ts';
 import { useApp, useAppState } from '../app-context.tsx';
+import { Icon, type IconName } from '../components/icons.tsx';
 import { confetti } from '../fx.ts';
 import { sfx } from '../sound.ts';
+
+/** Power-ups are interface concepts, so they use the same icons as the top bar. */
+const ITEM_ICONS: Record<string, IconName> = { freeze: 'freeze', hints5: 'hint', 'double-xp': 'bolt' };
 
 export function Shop() {
   const s = useAppState();
@@ -14,7 +18,7 @@ export function Shop() {
       const r = await api.buy(item.id);
       sfx.coin();
       confetti(60);
-      toast({ icon: item.icon, title: `Bought ${item.name}`, kind: 'success' });
+      toast({ title: `Bought ${item.name}`, kind: 'success' });
       announceAchievements(r.newAchievements);
       await refresh();
     } catch (e) {
@@ -56,22 +60,28 @@ export function Shop() {
                   ))}
                 </div>
               ) : (
-                <div className="shop-icon">{item.icon}</div>
+                <div className="shop-icon">{ITEM_ICONS[item.id] ? <Icon name={ITEM_ICONS[item.id]} size={20} /> : item.icon}</div>
               )}
               <div className="shop-name">{item.name}</div>
               <div className="muted small">{item.desc}</div>
               {item.id === 'freeze' && <div className="muted small">You have {p.streak.freezes}/3</div>}
               {consumable ? (
-                <button className="btn primary small" disabled={p.coins < item.price || maxed} onClick={() => void buy(item)}>
-                  {maxed ? 'Maxed' : `🪙 ${item.price}`}
+                <button className="btn small" disabled={p.coins < item.price || maxed} onClick={() => void buy(item)}>
+                  {maxed ? (
+                    'Maxed'
+                  ) : (
+                    <>
+                      <Icon name="coin" /> {item.price}
+                    </>
+                  )}
                 </button>
               ) : own ? (
-                <button className="btn small" disabled={equipped(item)} onClick={() => void equip(item)}>
+                <button className="btn ghost small" disabled={equipped(item)} onClick={() => void equip(item)}>
                   {equipped(item) ? 'Equipped' : 'Equip'}
                 </button>
               ) : (
-                <button className="btn primary small" disabled={p.coins < item.price} onClick={() => void buy(item)}>
-                  🪙 {item.price}
+                <button className="btn small" disabled={p.coins < item.price} onClick={() => void buy(item)}>
+                  <Icon name="coin" /> {item.price}
                 </button>
               )}
             </div>
@@ -85,12 +95,14 @@ export function Shop() {
     <div className="page">
       <div className="section-head">
         <h1>Shop</h1>
-        <span className="coin-balance">🪙 {p.coins}</span>
+        <span className="coin-balance" title="Your coins">
+          <Icon name="coin" /> {p.coins}
+        </span>
       </div>
       <p className="muted">Earn coins from XP (1 per 10 XP), daily quests and chests. Everything here is cosmetic or a study helper. Your learning is never paywalled.</p>
       {section('Power-ups', ['consumable', 'boost'])}
       {section('Themes', ['theme'])}
-      {section('Avatars', ['avatar'], 'The ⚡ avatar is free; equip it in Settings.')}
+      {section('Avatars', ['avatar'], 'The default avatar is free; equip it in Settings.')}
     </div>
   );
 }

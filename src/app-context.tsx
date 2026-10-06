@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ACHIEVEMENTS, SHOP } from '../shared/game.ts';
 import { ApiError, api, type AppState } from './api.ts';
+import { Icon } from './components/icons.tsx';
 import { setSoundEnabled, sfx } from './sound.ts';
 
 // ---------- routing (hash based, so the server needs no rewrites) ----------
@@ -28,7 +29,8 @@ export function navigate(path: string) {
 
 export interface Toast {
   id: number;
-  icon: string;
+  /** Shown only for achievements, where the icon is the achievement's own. */
+  icon?: string;
   title: string;
   body?: string;
   kind?: 'info' | 'error' | 'success' | 'achievement';
@@ -59,12 +61,11 @@ export function useAppState(): AppState {
 
 function applyTheme(themeId: string) {
   const item = SHOP.find((i) => i.id === themeId) ?? SHOP.find((i) => i.id === 'theme-midnight')!;
-  const [bg, surface, accent, accent2] = item.value as string[];
+  const [bg, surface, accent] = item.value as string[];
   const root = document.documentElement.style;
   root.setProperty('--bg', bg);
   root.setProperty('--surface', surface);
   root.setProperty('--accent', accent);
-  root.setProperty('--accent2', accent2);
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -98,7 +99,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const showError = useCallback(
     (e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e);
-      toast({ icon: '⚠️', title: msg, body: e instanceof ApiError ? e.hint : undefined, kind: 'error' });
+      toast({ title: msg, body: e instanceof ApiError ? e.hint : undefined, kind: 'error' });
     },
     [toast],
   );
@@ -122,7 +123,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   if (!state) {
     return (
       <div className="boot">
-        <div className="boot-logo">⚡</div>
+        <span className="brand-mark boot-logo">
+          <Icon name="bolt" size={14} filled />
+        </span>
         {loadError ? (
           <>
             <p>Could not reach the Flick server.</p>
@@ -147,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast toast-${t.kind ?? 'info'}`}>
-            <span className="toast-icon">{t.icon}</span>
+            {t.icon && <span className="toast-icon">{t.icon}</span>}
             <div>
               <div className="toast-title">{t.title}</div>
               {t.body && <div className="toast-body">{t.body}</div>}

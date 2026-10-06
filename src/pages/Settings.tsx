@@ -31,7 +31,7 @@ export function Settings() {
     try {
       const r = await api.testClaude();
       const used = r.models.length ? ` via ${r.models.join(', ')}` : '';
-      toast({ icon: '✅', title: 'Claude is connected', body: `${r.message} (${(r.durationMs / 1000).toFixed(1)}s${used})`, kind: 'success' });
+      toast({ title: 'Claude is connected', body: `${r.message} (${(r.durationMs / 1000).toFixed(1)}s${used})`, kind: 'success' });
     } catch (e) {
       showError(e);
     } finally {
@@ -44,7 +44,7 @@ export function Settings() {
     try {
       await api.importBackup(JSON.parse(await file.text()));
       await refresh();
-      toast({ icon: '📦', title: 'Backup restored', kind: 'success' });
+      toast({ title: 'Backup restored', kind: 'success' });
     } catch (e) {
       showError(e);
     }
@@ -98,7 +98,7 @@ export function Settings() {
           <span>Let Claude think before writing cards (about 3× slower, sometimes better cards)</span>
         </label>
         <button className="btn" disabled={testing} onClick={() => void test()}>
-          {testing ? <Spinner /> : '🔌'} Test connection
+          {testing && <Spinner />} Test connection
         </button>
       </div>
 
@@ -150,10 +150,10 @@ export function Settings() {
         </p>
         <div className="row">
           <a className="btn" href="/api/export" download>
-            ⬇ Export backup
+            Export backup
           </a>
           <button className="btn" onClick={() => fileRef.current?.click()}>
-            ⬆ Restore backup
+            Restore backup
           </button>
           <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && void restore(e.target.files[0])} />
         </div>

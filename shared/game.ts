@@ -255,7 +255,7 @@ export interface ShopItem {
   desc: string;
   icon: string;
   price: number;
-  /** For themes: [background, surface, accent, accent2]. For avatars: the emoji. */
+  /** For themes: [background, surface, accent]. For avatars: the emoji. */
   value?: string | string[];
   max?: number;
 }
@@ -264,12 +264,12 @@ export const SHOP: ShopItem[] = [
   { id: 'freeze', kind: 'consumable', name: 'Streak Freeze', desc: 'Protects your streak for one missed day. Hold up to 3.', icon: '🧊', price: 60, max: 3 },
   { id: 'hints5', kind: 'consumable', name: 'Hint Pack', desc: '+5 hints. Use them for 50/50 or letter reveals.', icon: '💡', price: 30 },
   { id: 'double-xp', kind: 'boost', name: 'Double XP (15 min)', desc: 'Every XP you earn is doubled for 15 minutes.', icon: '🚀', price: 80 },
-  { id: 'theme-midnight', kind: 'theme', name: 'Midnight', desc: 'The default dark theme.', icon: '🌌', price: 0, value: ['#0f1020', '#1a1b33', '#7c5cff', '#22d3ee'] },
-  { id: 'theme-sunset', kind: 'theme', name: 'Sunset', desc: 'Warm oranges and pinks.', icon: '🌅', price: 120, value: ['#1d0f1a', '#2c1726', '#ff6b6b', '#ffb347'] },
-  { id: 'theme-forest', kind: 'theme', name: 'Forest', desc: 'Calm greens.', icon: '🌲', price: 120, value: ['#0c1a12', '#14271c', '#34d399', '#a3e635'] },
-  { id: 'theme-ocean', kind: 'theme', name: 'Ocean', desc: 'Deep blues.', icon: '🌊', price: 120, value: ['#07141f', '#0e2233', '#38bdf8', '#2dd4bf'] },
-  { id: 'theme-candy', kind: 'theme', name: 'Candy', desc: 'Sweet pastels on a dark base.', icon: '🍬', price: 200, value: ['#1a1022', '#281933', '#f472b6', '#c084fc'] },
-  { id: 'theme-gold', kind: 'theme', name: 'Gold Rush', desc: 'For the high rollers.', icon: '🏆', price: 400, value: ['#14110a', '#221d10', '#fbbf24', '#f59e0b'] },
+  { id: 'theme-midnight', kind: 'theme', name: 'Midnight', desc: 'Graphite with a blue accent. The default.', icon: '🌌', price: 0, value: ['#0e0f11', '#16171a', '#7aa2f7'] },
+  { id: 'theme-sunset', kind: 'theme', name: 'Sunset', desc: 'Warm greys with a coral accent.', icon: '🌅', price: 120, value: ['#110f0e', '#1a1716', '#e9866a'] },
+  { id: 'theme-forest', kind: 'theme', name: 'Forest', desc: 'Green-grey with a sage accent.', icon: '🌲', price: 120, value: ['#0d100e', '#151916', '#7cc49a'] },
+  { id: 'theme-ocean', kind: 'theme', name: 'Ocean', desc: 'Blue-grey with a cyan accent.', icon: '🌊', price: 120, value: ['#0c0f12', '#13181d', '#5ab8de'] },
+  { id: 'theme-candy', kind: 'theme', name: 'Candy', desc: 'Plum greys with a pink accent.', icon: '🍬', price: 200, value: ['#110e12', '#1a161b', '#e08cbd'] },
+  { id: 'theme-gold', kind: 'theme', name: 'Gold Rush', desc: 'Warm black with a gold accent.', icon: '🏆', price: 400, value: ['#100f0c', '#191813', '#dcae4e'] },
   { id: 'avatar-fox', kind: 'avatar', name: 'Fox', desc: 'Clever and quick.', icon: '🦊', price: 50, value: '🦊' },
   { id: 'avatar-owl', kind: 'avatar', name: 'Owl', desc: 'Wise night studier.', icon: '🦉', price: 50, value: '🦉' },
   { id: 'avatar-octopus', kind: 'avatar', name: 'Octopus', desc: 'Eight arms, eight cards at once.', icon: '🐙', price: 80, value: '🐙' },
@@ -299,11 +299,11 @@ export interface MasteryTier {
 }
 
 export const MASTERY_TIERS: MasteryTier[] = [
-  { id: 0, name: 'New', color: '#64748b' },
-  { id: 1, name: 'Learning', color: '#f97316' },
-  { id: 2, name: 'Familiar', color: '#eab308' },
-  { id: 3, name: 'Proficient', color: '#22c55e' },
-  { id: 4, name: 'Mastered', color: '#a855f7' },
+  { id: 0, name: 'New', color: 'var(--tier-0)' },
+  { id: 1, name: 'Learning', color: 'var(--tier-1)' },
+  { id: 2, name: 'Familiar', color: 'var(--tier-2)' },
+  { id: 3, name: 'Proficient', color: 'var(--tier-3)' },
+  { id: 4, name: 'Mastered', color: 'var(--tier-4)' },
 ];
 
 /** Mastery tier from FSRS stability (days until recall drops to ~90%). */

@@ -55,7 +55,7 @@ export function ExplainModal({ card, onClose }: { card: Pick<Card, 'id' | 'front
           <div key={i}>
             {t.q && <div className="bubble me">{t.q}</div>}
             <div className="bubble claude">
-              <span className="bubble-who">✨ Claude</span>
+              <span className="bubble-who">Claude</span>
               {t.a === null ? <Spinner /> : <Markdown text={t.a} />}
             </div>
           </div>

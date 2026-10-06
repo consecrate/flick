@@ -3,6 +3,7 @@ import { ACHIEVEMENTS, letterHint, matchAnswer, xpForAnswer } from '../../shared
 import type { Reward, StudyMode } from '../../shared/types.ts';
 import { api, type CardView } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
+import { Icon } from '../components/icons.tsx';
 import { CountUp, Spinner } from '../components/ui.tsx';
 import { confetti, floatText } from '../fx.ts';
 import { sfx } from '../sound.ts';
@@ -150,7 +151,7 @@ export function QuestionView({
         </div>
       ) : (
         <div className="typed">
-          {hint && <div className="hint-text">💡 {hint}</div>}
+          {hint && <div className="hint-text">{hint}</div>}
           <input
             ref={inputRef}
             className={`input typed-input ${answered ? 'answered' : ''}`}
@@ -186,7 +187,7 @@ export function QuestionView({
       )}
       {allowHints && !answered && !usedHint && (
         <button className="btn small ghost hint-btn" disabled={s.profile.hints <= 0} onClick={() => void useHint()} title={s.profile.hints <= 0 ? 'Out of hints. Buy more in the shop.' : undefined}>
-          💡 {question.type === 'mcq' ? '50/50' : 'Reveal letters'} ({s.profile.hints})
+          <Icon name="hint" /> {question.type === 'mcq' ? '50/50' : 'Reveal letters'} <span className="num">{s.profile.hints}</span>
         </button>
       )}
     </div>
@@ -226,7 +227,7 @@ export function useSession(mode: StudyMode, deckId: string | null, scheduled: bo
       announceAchievements(r.newAchievements);
       for (const id of r.questsCompleted) {
         const q = s.profile.quests.list.find((x) => x.id === id);
-        toast({ icon: '📜', title: 'Quest complete!', body: q ? `${q.label}. Claim your reward on the home screen.` : undefined, kind: 'success' });
+        toast({ title: 'Quest complete', body: q ? `${q.label}. Claim your reward on the home screen.` : undefined, kind: 'success' });
       }
       return r;
     } catch (e) {
@@ -256,29 +257,23 @@ export function Hearts({ n, max }: { n: number; max: number }) {
   return (
     <span className="hearts" aria-label={`${n} of ${max} hearts`}>
       {Array.from({ length: max }, (_, i) => (
-        <span key={i} className={i < n ? 'heart' : 'heart lost'}>
-          ❤️
-        </span>
+        <Icon key={i} name="heart" size={14} filled={i < n} className={i < n ? 'heart' : 'heart lost'} />
       ))}
     </span>
   );
 }
 
 export function ComboMeter({ combo }: { combo: number }) {
-  if (combo < 2) return <span className="combo-meter idle">Combo</span>;
+  if (combo < 2) return <span className="combo-meter idle">combo –</span>;
   const hot = combo >= 10 ? 'blazing' : combo >= 5 ? 'hot' : '';
-  return (
-    <span key={combo} className={`combo-meter pop ${hot}`}>
-      🔥 {combo}× combo
-    </span>
-  );
+  return <span className={`combo-meter pop ${hot}`}>combo {combo}×</span>;
 }
 
 export function PlayHeader({ onQuit, children }: { onQuit: () => void; children: React.ReactNode }) {
   return (
     <div className="play-header">
       <button className="icon-btn quit" onClick={onQuit} title="Quit (progress is saved)">
-        ✕
+        <Icon name="x" />
       </button>
       {children}
     </div>
@@ -339,10 +334,10 @@ export function Feedback({
         </div>
       )}
       {card.explanation && <p className="feedback-expl">{card.explanation}</p>}
-      {appealNote && <p className="feedback-expl">⚖️ {appealNote}</p>}
+      {appealNote && <p className="feedback-expl">{appealNote}</p>}
       <div className="feedback-actions">
         <button className="btn ghost small" onClick={onExplain}>
-          💬 Ask Claude
+          <Icon name="chat" /> Ask Claude
         </button>
         {onAppeal && !outcome.correct && outcome.type === 'typed' && outcome.given.trim() && (
           <button className="btn ghost small" disabled={appealing} onClick={onAppeal}>
@@ -351,20 +346,20 @@ export function Feedback({
                 <Spinner /> Claude is judging…
               </>
             ) : (
-              '⚖️ I was right: ask Claude'
+              'I was right: ask Claude'
             )}
           </button>
         )}
         <div className="grow" />
         <button className={`btn big ${outcome.correct ? 'good' : 'primary'}`} onClick={onContinue}>
-          Continue ↵
+          Continue <kbd>Enter</kbd>
         </button>
       </div>
     </div>
   );
 }
 
-const PRAISE = ['Nice!', 'Correct!', 'Nailed it!', 'Brilliant!', 'You got it!', 'Spot on!', 'Sharp!', 'Yes!'];
+const PRAISE = ['Correct', 'Right', 'That’s it', 'Correct', 'Spot on'];
 function pickPraise() {
   return PRAISE[Math.floor(Math.random() * PRAISE.length)];
 }
@@ -373,7 +368,7 @@ export function celebrateCorrect(combo: number, xp: number, anchor: HTMLElement 
   sfx.correct(combo);
   if (xp > 0) floatText(`+${xp} XP`, anchor);
   if (combo > 0 && combo % 5 === 0) {
-    floatText(`🔥 ${combo}× combo!`, anchor ? { x: anchor.getBoundingClientRect().left + 80, y: anchor.getBoundingClientRect().top - 30 } : null, 'var(--warn)');
+    floatText(`${combo}× combo`, anchor ? { x: anchor.getBoundingClientRect().left + 80, y: anchor.getBoundingClientRect().top - 30 } : null, 'var(--warn)');
     confetti(60);
   }
 }
@@ -424,7 +419,11 @@ export function Results({
           <span className="results-xp-num">
             +<CountUp value={reward.totalXp} /> XP
           </span>
-          {reward.coins > 0 && <span className="results-coins">🪙 +{reward.coins}</span>}
+          {reward.coins > 0 && (
+            <span className="results-coins">
+              <Icon name="coin" /> +{reward.coins}
+            </span>
+          )}
         </div>
       )}
       <div className="results-stats">
@@ -438,25 +437,25 @@ export function Results({
       {reward && reward.bonusReasons.length > 0 && (
         <ul className="bonus-list">
           {reward.bonusReasons.map((b) => (
-            <li key={b}>✨ {b}</li>
+            <li key={b}>{b}</li>
           ))}
         </ul>
       )}
       {levelUp && (
         <div className="banner levelup">
-          ⭐ Level up! You reached <b>level {reward!.levelAfter}</b>
+          Level up. You reached <b>level {reward!.levelAfter}</b>.
         </div>
       )}
       {streakUp && (
         <div className="banner streak">
-          🔥 Streak extended to <b>{reward!.streakAfter} day{reward!.streakAfter === 1 ? '' : 's'}</b>
+          Streak extended to <b>{reward!.streakAfter} day{reward!.streakAfter === 1 ? '' : 's'}</b>.
         </div>
       )}
-      {reward?.goalReached && <div className="banner goal">🎯 Daily goal reached! Your chest is waiting on the home screen.</div>}
-      {reward?.newRecord && <div className="banner record">🏆 New personal record!</div>}
+      {reward?.goalReached && <div className="banner goal">Daily goal reached. Your chest is waiting on the home screen.</div>}
+      {reward?.newRecord && <div className="banner record">New personal record.</div>}
       {achievements.map((a) => (
         <div key={a!.id} className="banner achievement">
-          {a!.icon} Achievement unlocked: <b>{a!.name}</b>
+          Achievement unlocked: <b>{a!.name}</b>
         </div>
       ))}
       <div className="results-actions">
@@ -469,7 +468,9 @@ export function Results({
           </button>
         )}
       </div>
-      <p className="muted small">Today: {s.todayXp} / {s.settings.dailyGoalXp} XP</p>
+      <p className="muted small">
+        Today <span className="num">{s.todayXp} / {s.settings.dailyGoalXp}</span> XP
+      </p>
     </div>
   );
 }

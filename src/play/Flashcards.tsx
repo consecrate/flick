@@ -3,6 +3,7 @@ import type { Reward } from '../../shared/types.ts';
 import { api, type CardView } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
+import { Icon } from '../components/icons.tsx';
 import { EmptyState, ProgressBar, Spinner } from '../components/ui.tsx';
 import { floatText } from '../fx.ts';
 import { sfx } from '../sound.ts';
@@ -134,7 +135,7 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
   if (!card) {
     return (
       <div className="play">
-        <EmptyState icon="🎉" title="Nothing due right now">
+        <EmptyState title="Nothing due right now">
           <div className="row center-row">
             <button className="btn" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
               Back
@@ -186,7 +187,7 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
                 setExplain(true);
               }}
             >
-              💬 Ask Claude
+              <Icon name="chat" /> Ask Claude
             </button>
           </div>
         </div>

@@ -6,12 +6,12 @@ import { ClaudeLoader, Modal } from './ui.tsx';
 
 type Tab = 'files' | 'text' | 'url' | 'topic' | 'pairs';
 
-const TABS: { id: Tab; icon: string; label: string }[] = [
-  { id: 'files', icon: '📄', label: 'Files' },
-  { id: 'text', icon: '📝', label: 'Notes' },
-  { id: 'url', icon: '🔗', label: 'Web link' },
-  { id: 'topic', icon: '💭', label: 'Topic' },
-  { id: 'pairs', icon: '📥', label: 'Import list' },
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'files', label: 'Files' },
+  { id: 'text', label: 'Notes' },
+  { id: 'url', label: 'Web link' },
+  { id: 'topic', label: 'Topic' },
+  { id: 'pairs', label: 'Import list' },
 ];
 
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.md,.csv,.tsv,.html,.srt,.vtt,.json';
@@ -70,9 +70,9 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
       else source = { type: 'pairs', text };
       const r = await api.generate({ deckId, source, count, focus: focus || undefined, level: level || undefined, title: title || undefined });
       sfx.unlock();
-      toast({ icon: '✨', title: `${r.added} cards added to ${r.deck.title}`, kind: 'success' });
+      toast({ title: `${r.added} cards added to ${r.deck.title}`, kind: 'success' });
       if (r.needsDistractors) {
-        toast({ icon: '🧠', title: 'Tip: use “Make quiz options” on the deck', body: 'Claude can write multiple-choice options for imported cards.' });
+        toast({ title: 'Tip: use “Write quiz options” on the deck', body: 'Claude can write multiple-choice options for imported cards.' });
       }
       await refresh();
       announceAchievements(r.newAchievements);
@@ -99,7 +99,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
           <div className="tabs">
             {TABS.map((t) => (
               <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-                <span>{t.icon}</span> {t.label}
+                {t.label}
               </button>
             ))}
           </div>
@@ -120,7 +120,6 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
               onClick={() => fileInput.current?.click()}
             >
               <input ref={fileInput} type="file" multiple accept={ACCEPT} hidden onChange={(e) => addFiles(e.target.files)} />
-              <div className="dropzone-icon">📂</div>
               <p>
                 <strong>Drop files here</strong> or click to browse
               </p>
@@ -194,7 +193,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
               Cancel
             </button>
             <button className="btn primary big" disabled={!ready} onClick={() => void submit()}>
-              {tab === 'pairs' ? 'Import cards' : '✨ Generate flashcards'}
+              {tab === 'pairs' ? 'Import cards' : 'Generate flashcards'}
             </button>
           </div>
         </>
