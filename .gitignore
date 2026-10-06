@@ -1,0 +1,5 @@
+node_modules
+dist
+.flick-data
+*.log
+.DS_Store
