@@ -43,6 +43,8 @@ export interface ClaudeResult<T> {
   data: T;
   costUsd?: number;
   durationMs?: number;
+  /** Model IDs Claude Code reports having used for this call. */
+  models: string[];
 }
 
 // Keep a small queue so a burst of requests does not spawn many CLIs at once.
@@ -81,8 +83,6 @@ export async function callClaude<T = string>(opts: ClaudeCallOptions): Promise<C
     '-p',
     '--output-format',
     'json',
-    '--model',
-    opts.model,
     '--system-prompt',
     opts.system,
     '--no-session-persistence',
@@ -90,6 +90,8 @@ export async function callClaude<T = string>(opts: ClaudeCallOptions): Promise<C
     '--tools',
     opts.tools?.length ? opts.tools.join(',') : '',
   ];
+  // 'default' leaves the choice to Claude Code's own configuration.
+  if (opts.model !== 'default') args.push('--model', opts.model);
   if (opts.tools?.length) args.push('--allowedTools', ...opts.tools);
   if (opts.addDirs?.length) args.push('--add-dir', ...opts.addDirs);
   if (opts.schema) args.push('--json-schema', JSON.stringify(opts.schema));
@@ -132,6 +134,7 @@ export async function callClaude<T = string>(opts: ClaudeCallOptions): Promise<C
       total_cost_usd?: number;
       duration_ms?: number;
       subtype?: string;
+      modelUsage?: Record<string, unknown>;
     };
     try {
       parsed = JSON.parse(stdout);
@@ -142,7 +145,9 @@ export async function callClaude<T = string>(opts: ClaudeCallOptions): Promise<C
       const msg = parsed.result ?? parsed.subtype ?? 'unknown error';
       const loginHint = /log ?in|auth|credential|401|403/i.test(msg)
         ? 'Run `claude` in a terminal and log in with your Claude subscription, then try again.'
-        : undefined;
+        : /model/i.test(msg)
+          ? `Check the model "${opts.model}" in Settings. Your Claude Code version or plan may not offer it.`
+          : undefined;
       throw new ClaudeError(`Claude Code reported an error: ${msg}`, loginHint);
     }
     let data: unknown = parsed.structured_output;
@@ -157,6 +162,7 @@ export async function callClaude<T = string>(opts: ClaudeCallOptions): Promise<C
       data: (opts.schema ? data : parsed.result) as T,
       costUsd: parsed.total_cost_usd,
       durationMs: parsed.duration_ms,
+      models: Object.keys(parsed.modelUsage ?? {}),
     };
   } finally {
     release();

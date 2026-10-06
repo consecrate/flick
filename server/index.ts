@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ACHIEVEMENTS, SHOP, addDays, checkAchievements, effectiveStreak, levelInfo, localDay, masteryTier, rollChest } from '../shared/game.ts';
-import type { Card, Deck, Material, SessionComplete, Settings, AnswerRequest } from '../shared/types.ts';
+import { isValidModel, type Card, type Deck, type Material, type SessionComplete, type Settings, type AnswerRequest } from '../shared/types.ts';
 import { explainCard, generateCards, gradeAnswer, makeDistractors, parsePairs } from './ai.ts';
 import { ClaudeError, UPLOAD_DIR, callClaude, claudeVersion } from './claude.ts';
 import { DATA_DIR, db, replaceAll, save, uid, type Data } from './db.ts';
@@ -107,10 +107,11 @@ app.post(
     const r = await callClaude<string>({
       system: 'Reply with one short upbeat sentence.',
       prompt: 'Say hi to a student who just connected their flashcard app to Claude.',
-      model: 'haiku',
+      // Test the configured model so a typo in a custom model ID shows up here.
+      model: db.settings.model,
       timeoutMs: 60_000,
     });
-    res.json({ ok: true, message: r.text, durationMs: r.durationMs });
+    res.json({ ok: true, message: r.text, durationMs: r.durationMs, models: r.models });
   }),
 );
 
@@ -391,8 +392,7 @@ app.post(
     const card = findCard(String(req.body.cardId));
     const given = String(req.body.given ?? '').trim();
     if (!given) throw new HttpError(400, 'Empty answer');
-    // Grading is a quick judgement; Haiku is fast and plenty for it.
-    const verdict = await gradeAnswer({ question: card.front, expected: card.back, given, model: 'haiku' });
+    const verdict = await gradeAnswer({ question: card.front, expected: card.back, given, model: db.settings.gradingModel });
     if (verdict.correct) {
       db.profile.stats.appeals++;
       save();
@@ -553,7 +553,11 @@ app.post(
 app.patch('/api/settings', (req, res) => {
   const s = db.settings;
   const b = req.body as Partial<Settings>;
-  if (b.model && ['haiku', 'sonnet', 'opus'].includes(b.model)) s.model = b.model;
+  for (const m of [b.model, b.gradingModel]) {
+    if (m !== undefined && !isValidModel(m)) throw new HttpError(400, `Invalid model name: ${String(m).slice(0, 100)}`);
+  }
+  if (b.model) s.model = b.model;
+  if (b.gradingModel) s.gradingModel = b.gradingModel;
   if (typeof b.desiredRetention === 'number') s.desiredRetention = Math.min(0.97, Math.max(0.7, b.desiredRetention));
   if (typeof b.newPerDay === 'number') s.newPerDay = Math.max(0, Math.min(500, Math.round(b.newPerDay)));
   if (typeof b.sessionSize === 'number') s.sessionSize = Math.max(4, Math.min(50, Math.round(b.sessionSize)));

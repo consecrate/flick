@@ -1,6 +1,23 @@
 // Types shared by the server and the web client.
 
-export type ModelChoice = 'haiku' | 'sonnet' | 'opus';
+/**
+ * Model passed to `claude --model`. Either a Claude Code alias ('haiku',
+ * 'sonnet', 'opus'), a full model ID (e.g. 'claude-sonnet-5-5'), or 'default'
+ * to use whatever model Claude Code itself is configured with.
+ */
+export type ModelChoice = string;
+
+export const MODEL_PRESETS: { value: ModelChoice; label: string }[] = [
+  { value: 'haiku', label: 'Haiku: fastest, lightest on usage limits' },
+  { value: 'sonnet', label: 'Sonnet: balanced (recommended)' },
+  { value: 'opus', label: 'Opus: best quality, uses the most of your limits' },
+  { value: 'default', label: "Claude Code's default (whatever `/model` is set to)" },
+];
+
+/** Aliases and model IDs only: letters, digits, dots, dashes, underscores and a [1m]-style suffix. */
+export function isValidModel(m: unknown): m is ModelChoice {
+  return typeof m === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}(\[[A-Za-z0-9]+\])?$/.test(m);
+}
 
 /** FSRS card state as stored on disk (dates are ISO strings). */
 export interface SrsState {
@@ -128,7 +145,10 @@ export interface Profile {
 }
 
 export interface Settings {
+  /** Model for writing cards, distractors and explanations. */
   model: ModelChoice;
+  /** Model for judging typed answers and appeals. Should be fast. */
+  gradingModel: ModelChoice;
   desiredRetention: number;
   newPerDay: number;
   sessionSize: number;

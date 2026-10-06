@@ -58,6 +58,7 @@ export function defaultProfile(): Profile {
 export function defaultSettings(): Settings {
   return {
     model: 'sonnet',
+    gradingModel: 'haiku',
     desiredRetention: 0.9,
     newPerDay: 20,
     sessionSize: 12,
