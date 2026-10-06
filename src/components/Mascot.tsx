@@ -1,5 +1,8 @@
 // Flicky, the flashcard mascot. Drawn in the theme accent so it matches every theme.
 
+import { useEffect, useRef, useState } from 'react';
+import { sfx } from '../sound.ts';
+
 export type Mood = 'happy' | 'sleepy' | 'sad' | 'wow';
 
 export function Mascot({ mood = 'happy', size = 120, className = '' }: { mood?: Mood; size?: number; className?: string }) {
@@ -49,5 +52,25 @@ export function Mascot({ mood = 'happy', size = 120, className = '' }: { mood?: 
         </g>
       )}
     </svg>
+  );
+}
+
+/** Flicky as a button: hops in on mount, and jumps with a boing when poked. */
+export function PokeableMascot({ mood = 'happy', size = 120 }: { mood?: Mood; size?: number }) {
+  const [jumps, setJumps] = useState(0);
+  const [excited, setExcited] = useState(false);
+  const timer = useRef(0);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const onPoke = () => {
+    sfx.boing();
+    setJumps((n) => n + 1);
+    setExcited(true);
+    clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setExcited(false), 900);
+  };
+  return (
+    <button type="button" className="mascot-btn" onClick={onPoke} aria-label="Poke Flicky">
+      <Mascot key={jumps} mood={excited ? 'wow' : mood} size={size} className={jumps ? 'jump' : 'hop-in'} />
+    </button>
   );
 }

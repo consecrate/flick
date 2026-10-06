@@ -427,7 +427,7 @@ export function Results({
       {reward && (
         <div className="results-xp">
           <span className="results-xp-num">
-            +<CountUp value={reward.totalXp} /> XP
+            +<CountUp value={reward.totalXp} delay={450} duration={1100} sound /> XP
           </span>
           {reward.coins > 0 && (
             <span className="results-coins">🪙 +{reward.coins}</span>

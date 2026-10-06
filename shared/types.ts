@@ -154,6 +154,8 @@ export interface Settings {
   sessionSize: number;
   dailyGoalXp: number;
   sound: boolean;
+  /** Sound effect volume, 0 to 1. */
+  soundVolume: number;
   maxIntervalDays: number;
   /** Let Claude think before writing cards (slower, sometimes better). */
   thinking: boolean;

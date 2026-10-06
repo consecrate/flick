@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ACHIEVEMENTS, SHOP } from '../shared/game.ts';
 import { ApiError, api, type AppState } from './api.ts';
 import { Icon } from './components/icons.tsx';
-import { setSoundEnabled, sfx } from './sound.ts';
+import { setSoundEnabled, setSoundVolume, sfx } from './sound.ts';
 
 // ---------- routing (hash based, so the server needs no rewrites) ----------
 
@@ -84,6 +84,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLoadError(null);
       applyTheme(s.profile.theme);
       setSoundEnabled(s.settings.sound);
+      setSoundVolume(s.settings.soundVolume);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }

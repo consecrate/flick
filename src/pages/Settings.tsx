@@ -4,6 +4,7 @@ import { MODEL_PRESETS, isValidModel, type ModelChoice, type Settings as Setting
 import { api } from '../api.ts';
 import { useApp, useAppState } from '../app-context.tsx';
 import { Spinner } from '../components/ui.tsx';
+import { setSoundEnabled, setSoundVolume, sfx } from '../sound.ts';
 
 export function Settings() {
   const s = useAppState();
@@ -138,9 +139,32 @@ export function Settings() {
           </select>
         </label>
         <label className="check">
-          <input type="checkbox" checked={st.sound} onChange={(e) => void set({ sound: e.target.checked })} />
+          <input type="checkbox" checked={st.sound} onChange={(e) => {
+              setSoundEnabled(e.target.checked);
+              void set({ sound: e.target.checked });
+            }} />
           <span>Sound effects</span>
         </label>
+        {st.sound && (
+          <label className="field">
+            <span>
+              Volume: <b>{Math.round(st.soundVolume * 100)}%</b>
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={st.soundVolume}
+              onChange={(e) => {
+                setSoundVolume(+e.target.value);
+                void set({ soundVolume: +e.target.value });
+              }}
+              onPointerUp={() => sfx.correct(0)}
+              onKeyUp={() => sfx.correct(0)}
+            />
+          </label>
+        )}
       </div>
 
       <div className="panel">

@@ -3,8 +3,8 @@ import { api } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
 import { ImportModal } from '../components/ImportModal.tsx';
 import { Icon } from '../components/icons.tsx';
-import { Mascot } from '../components/Mascot.tsx';
-import { EmptyState, Modal, ProgressBar, Ring } from '../components/ui.tsx';
+import { PokeableMascot } from '../components/Mascot.tsx';
+import { CountUp, EmptyState, Modal, ProgressBar, Ring } from '../components/ui.tsx';
 import { confetti } from '../fx.ts';
 import { sfx } from '../sound.ts';
 
@@ -28,9 +28,9 @@ export function Home() {
   const openChest = async () => {
     try {
       const loot = await api.openChest();
-      sfx.victory();
-      confetti(180);
+      sfx.chest();
       setChestLoot(loot);
+      setTimeout(() => confetti(180), 380);
       announceAchievements(loot.newAchievements);
       await refresh();
     } catch (e) {
@@ -53,7 +53,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div className="hero-text">
-          <Mascot mood={s.dueTotal + s.newTotal > 0 ? 'happy' : 'sleepy'} size={150} className="bob" />
+          <PokeableMascot mood={s.dueTotal + s.newTotal > 0 ? 'happy' : 'sleepy'} size={150} />
           <div className="hero-copy">
             <div className="eyebrow">
               {greeting()}, {p.name} {p.avatar}
@@ -81,7 +81,9 @@ export function Home() {
         </div>
         <div className="goal-card">
           <Ring value={goalPct} size={124} stroke={14} color={goalPct >= 1 ? 'var(--good)' : 'var(--accent)'}>
-            <div className="goal-num">{s.todayXp}</div>
+            <div className="goal-num">
+              <CountUp value={s.todayXp} />
+            </div>
             <div className="muted small num">/ {goal} XP</div>
           </Ring>
           <div>

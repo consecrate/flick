@@ -361,9 +361,46 @@ input[type='range'] {
   cursor: pointer;
 }
 .check input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
+  appearance: none;
+  flex-shrink: 0;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border-radius: var(--pill);
+  background: var(--track);
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+  cursor: pointer;
+  transition: background 0.2s var(--ease), box-shadow 0.2s;
+}
+.check input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.15);
+  transition: transform 0.3s var(--bounce), width 0.15s;
+}
+.check input:active::after {
+  width: 24px;
+}
+.check input:checked {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.check input:checked::after {
+  transform: translateX(18px);
+}
+.check input:checked:active::after {
+  transform: translateX(14px);
+}
+.check input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  outline-offset: 2px;
 }
 
 .chip {
@@ -1586,6 +1623,7 @@ main {
   border-color: transparent;
   background: var(--bad-soft);
   color: var(--bad);
+  animation: shake 0.35s;
 }
 .option.removed {
   opacity: 0.2;
@@ -2285,6 +2323,8 @@ main {
 .fx-canvas {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
   z-index: 200;
 }
@@ -2491,4 +2531,284 @@ main {
   font-size: 28px;
   line-height: 1.2;
   margin-bottom: var(--s1);
+}
+
+/* ---------- motion ----------
+   Motion marks something that just happened: a page arriving, an answer
+   landing, a number changing, a reward. Nothing loops on screens you read. */
+
+.route,
+.play {
+  animation: route-in 0.4s var(--ease) backwards;
+}
+@keyframes route-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* Cards in a grid arrive one after another. */
+.deck-grid > *,
+.arcade-grid > *,
+.stat-grid > *,
+.shop-grid > *,
+.trophy-grid > *,
+.modes > *,
+.quest,
+.results > * {
+  animation: rise-in 0.5s var(--bounce) backwards;
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+}
+:is(.deck-grid, .arcade-grid, .stat-grid, .shop-grid, .trophy-grid, .modes, .results) > :nth-child(2),
+.quest:nth-child(2) {
+  animation-delay: 50ms;
+}
+:is(.deck-grid, .arcade-grid, .stat-grid, .shop-grid, .trophy-grid, .modes, .results) > :nth-child(3),
+.quest:nth-child(3) {
+  animation-delay: 100ms;
+}
+:is(.deck-grid, .arcade-grid, .stat-grid, .shop-grid, .trophy-grid, .modes, .results) > :nth-child(4),
+.quest:nth-child(4) {
+  animation-delay: 150ms;
+}
+:is(.deck-grid, .arcade-grid, .stat-grid, .shop-grid, .trophy-grid, .modes, .results) > :nth-child(5) {
+  animation-delay: 200ms;
+}
+:is(.deck-grid, .arcade-grid, .stat-grid, .shop-grid, .trophy-grid, .modes, .results) > :nth-child(6) {
+  animation-delay: 250ms;
+}
+:is(.deck-grid, .arcade-grid, .stat-grid, .shop-grid, .trophy-grid, .modes, .results) > :nth-child(7) {
+  animation-delay: 300ms;
+}
+:is(.deck-grid, .arcade-grid, .stat-grid, .shop-grid, .trophy-grid, .modes, .results) > :nth-child(8) {
+  animation-delay: 350ms;
+}
+:is(.deck-grid, .arcade-grid, .stat-grid, .shop-grid, .trophy-grid, .modes, .results) > :nth-child(n + 9) {
+  animation-delay: 400ms;
+}
+/* Results reveal a little slower so each line registers. */
+.results > :nth-child(n) {
+  animation-duration: 0.55s;
+}
+.results > .banner {
+  animation-name: pop-in;
+}
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+.results-stats .stat-tile {
+  animation: pop-in 0.45s var(--bounce) backwards;
+}
+.results-stats .stat-tile:nth-child(2) {
+  animation-delay: 80ms;
+}
+.results-stats .stat-tile:nth-child(3) {
+  animation-delay: 160ms;
+}
+.results-stats .stat-tile:nth-child(4) {
+  animation-delay: 240ms;
+}
+
+/* Progress fills grow in from empty. */
+.bar-fill {
+  animation: fill-in 0.9s var(--ease) backwards;
+}
+@keyframes fill-in {
+  from {
+    width: 0;
+  }
+}
+.ring svg circle:last-child {
+  animation: ring-in 1.1s var(--ease) backwards;
+}
+@keyframes ring-in {
+  from {
+    stroke-dashoffset: var(--ring-c);
+  }
+}
+
+/* HUD numbers pop when they change. */
+.bump {
+  display: inline-block;
+  animation: bump 0.5s var(--bounce);
+}
+@keyframes bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.55) translateY(-2px);
+    color: var(--accent);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Flicky hops in, and jumps when poked. */
+.mascot-btn {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--r-lg);
+  transition: transform 0.25s var(--bounce);
+}
+.mascot-btn:hover {
+  transform: rotate(-4deg) scale(1.04);
+}
+.mascot-btn:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.mascot.hop-in {
+  animation: hop-in 0.7s var(--bounce) 0.15s backwards;
+}
+.mascot.jump {
+  animation: jump 0.6s var(--ease);
+}
+@keyframes hop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.6);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1.06);
+  }
+  75% {
+    transform: translateY(0) scale(0.97, 1.03);
+  }
+}
+@keyframes jump {
+  0% {
+    transform: none;
+  }
+  20% {
+    transform: translateY(4px) scale(1.1, 0.88);
+  }
+  50% {
+    transform: translateY(-26px) rotate(-8deg) scale(0.95, 1.06);
+  }
+  75% {
+    transform: translateY(0) scale(1.06, 0.94);
+  }
+  100% {
+    transform: none;
+  }
+}
+.results > .mascot {
+  animation-name: hop-in;
+  animation-duration: 0.7s;
+}
+
+/* Small reactions on hover. */
+.nav a:hover .nav-emoji,
+.arcade-tile:hover:not(:disabled) .arcade-icon,
+.mode-btn:hover .mode-icon {
+  animation: wiggle 0.5s var(--ease);
+}
+.deck-emoji {
+  transition: transform 0.3s var(--bounce);
+}
+.deck-card:hover .deck-emoji {
+  transform: rotate(-8deg) scale(1.1);
+}
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-14deg) scale(1.15);
+  }
+  60% {
+    transform: rotate(10deg) scale(1.1);
+  }
+}
+.nav-emoji,
+.arcade-icon,
+.mode-icon {
+  display: inline-block;
+}
+
+/* Each question slides in as a new card. */
+.q-card {
+  animation: card-in 0.4s var(--bounce);
+}
+.options .option {
+  animation: rise-in 0.35s var(--bounce) backwards;
+}
+.options .option:nth-child(2) {
+  animation-delay: 40ms;
+}
+.options .option:nth-child(3) {
+  animation-delay: 80ms;
+}
+.options .option:nth-child(4) {
+  animation-delay: 120ms;
+}
+.options .option.right {
+  animation: pop 0.35s var(--bounce);
+}
+.options .option.wrong {
+  animation: shake 0.35s;
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px) rotate(2deg);
+  }
+}
+
+/* Treasure: the button wiggles once to get noticed; the chest bursts open. */
+.chest-btn {
+  animation: wiggle 0.6s var(--ease) 0.8s;
+}
+.chest-open {
+  display: inline-block;
+  animation: chest-open 0.8s var(--ease);
+}
+@keyframes chest-open {
+  0% {
+    transform: scale(0.6);
+  }
+  15% {
+    transform: scale(0.9) rotate(-12deg);
+  }
+  30% {
+    transform: scale(0.9) rotate(12deg);
+  }
+  45% {
+    transform: scale(0.9) rotate(-8deg);
+  }
+  70% {
+    transform: scale(1.3) rotate(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.loot {
+  animation: pop-in 0.45s var(--bounce) backwards;
+  animation-delay: 0.45s;
+}
+.loot + .loot {
+  animation-delay: 0.6s;
+}
+.loot + .loot + .loot {
+  animation-delay: 0.75s;
 }

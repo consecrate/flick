@@ -72,7 +72,7 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
   const click = (t: Tile, el: HTMLElement) => {
     if (cleared.has(t.key) || finalMs !== null) return;
     if (!selected) {
-      sfx.click();
+      sfx.select();
       setSelected(t);
       return;
     }
