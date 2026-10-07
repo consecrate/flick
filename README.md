@@ -42,6 +42,29 @@ Data lives in `~/.flick/data.json` (override with `FLICK_DATA_DIR`). Export and 
 | `CLAUDE_BIN` | `claude` | Path to the Claude Code CLI |
 | `FLICK_ALLOW_API_KEY` | unset | Set to `1` to let Claude Code use `ANTHROPIC_API_KEY` |
 
+## Mac app
+
+Flick also ships as a desktop app built with [Tauri](https://tauri.app). It runs the same UI and server as `npm start`: the server is compiled into a single binary with Bun and bundled inside the app, so the app needs no Node install. It still needs Claude Code installed and logged in.
+
+**Install.** Each push to `main` (and each pull request) builds `.dmg` files in GitHub Actions. Open the latest run of the **Desktop app** workflow, download `Flick-macOS-AppleSilicon` (M1 and later) or `Flick-macOS-Intel`, unzip it, open the `.dmg` and drag Flick to Applications.
+
+**First launch.** The app is not signed with an Apple Developer ID yet, so macOS blocks it the first time. Run this once in Terminal, then open Flick normally:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Flick.app
+```
+
+(Alternatively: try to open it, then go to System Settings → Privacy & Security and click **Open Anyway**.)
+
+The app uses the same data as the web version (`~/.flick`). It finds the `claude` CLI through your login shell's `PATH`, so if `claude` works in Terminal it works in the app.
+
+**Building locally** (on a Mac, with Rust and Bun installed):
+
+```bash
+npm run app:dev      # run the app in development
+npm run app:build    # build Flick.app and a .dmg into src-tauri/target/release/bundle
+```
+
 ## Features
 
 ### Making cards (Gizmo-style "magic import")
@@ -94,4 +117,6 @@ server/   Express API: JSON store, Claude Code bridge, prompts, FSRS, game engin
 shared/   Types and pure game rules used by both sides (XP, streaks, quests, shop…)
 src/      React UI (Vite): pages, play modes, effects, sounds
 tests/    Vitest unit tests
+src-tauri/ Mac app shell (Tauri): starts the bundled server and opens a window on it
+scripts/  build-server.mjs compiles server/ into the app's server binary
 ```

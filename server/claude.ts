@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ModelChoice } from '../shared/types.ts';
+import { shellPathReady } from './desktop.ts';
 
 const CLAUDE_BIN = process.env.CLAUDE_BIN ?? 'claude';
 
@@ -96,6 +97,7 @@ export async function callClaude<T = string>(opts: ClaudeCallOptions): Promise<C
   if (opts.addDirs?.length) args.push('--add-dir', ...opts.addDirs);
   if (opts.schema) args.push('--json-schema', JSON.stringify(opts.schema));
 
+  await shellPathReady;
   await acquire();
   try {
     const stdout = await new Promise<string>((resolve, reject) => {
@@ -180,6 +182,7 @@ function extractJson(text: string): unknown {
 }
 
 export async function claudeVersion(): Promise<string | null> {
+  await shellPathReady;
   return new Promise((resolve) => {
     const child = spawn(CLAUDE_BIN, ['--version'], { env: childEnv() });
     let out = '';
