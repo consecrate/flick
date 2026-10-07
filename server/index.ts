@@ -287,7 +287,6 @@ app.post(
   wrap(async (req, res) => {
     const b = req.body ?? {};
     const source = b.source ?? {};
-    const count = Math.max(3, Math.min(60, Number(b.count) || 15));
     let deck = b.deckId ? findDeck(b.deckId) : null;
     const existingFronts = deck ? db.cards.filter((c) => c.deckId === deck!.id).map((c) => (c.title ? `${c.title}: ${c.front}` : c.front)) : [];
 
@@ -308,11 +307,11 @@ app.post(
     if (source.type === 'mcq') {
       const { questions, errors } = parseMcqs(String(source.text ?? ''));
       if (!questions.length) {
-        throw new HttpError(400, errors.length ? `${errors.length === 1 ? 'The question' : `None of the ${errors.length} questions`} could be read. ${errors[0].title}: ${errors[0].message}.` : 'No questions found. Each question must start with a "## " title line.');
+        throw new HttpError(400, errors.length ? `${errors.length === 1 ? 'The card' : `None of the ${errors.length} cards`} could be read. ${errors[0].title}: ${errors[0].message}.` : 'No cards found. Each card must start with a "## " title line.');
       }
-      deck ??= createDeck(String(b.title ?? '') || 'Imported questions', '🎯');
-      const mat = addMaterial(deck.id, 'mcq', `Imported questions (${questions.length})`, questions.slice(0, 3).map((q) => q.title || q.question).join(' · '));
-      const added = questions.map((q) => addCard(deck!.id, { ...q, front: q.question, back: q.answer, mcq: true }, mat.id));
+      deck ??= createDeck(String(b.title ?? '') || 'Imported cards', '📋');
+      const mat = addMaterial(deck.id, 'mcq', `Pasted from AI (${questions.length})`, questions.slice(0, 3).map((q) => q.title || q.question).join(' · '));
+      const added = questions.map(({ flashcard, ...q }) => addCard(deck!.id, { ...q, title: flashcard ? undefined : q.title, front: q.question, back: q.answer, mcq: !flashcard }, mat.id));
       mat.cardCount = added.length;
       save();
       res.json({ deck: summarizeDeck(deck.id), added: added.length, skipped: errors.length, material: mat, newAchievements: checkAchievements(db.profile) });
@@ -363,11 +362,9 @@ app.post(
         files,
         topic: source.type === 'topic' ? String(source.topic) : undefined,
         url: source.type === 'url' ? String(source.url) : undefined,
-        count,
         focus: b.focus ? String(b.focus) : undefined,
         level: b.level ? String(b.level) : undefined,
         existingFronts,
-        style: b.style === 'mcq' ? 'mcq' : 'cards',
         model: db.settings.model,
         thinking: db.settings.thinking,
       });

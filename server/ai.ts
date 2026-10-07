@@ -1,45 +1,36 @@
 // Prompts and schemas for every AI feature.
 
 import type { ModelChoice } from '../shared/types.ts';
-import { MCQ_GUIDE, normalizeLang } from '../shared/mcq.ts';
+import { EXPLANATION_GUIDE, FLASHCARD_GUIDE, WRITING_GUIDE, normalizeLang } from '../shared/mcq.ts';
 import { callClaude } from './claude.ts';
 
 /** Plain-English rules for every explanation Claude writes for a student. */
 const PLAIN_ENGLISH = `Write explanations for a smart student who is new to the subject: plain English, short sentences, active voice, literal words. Define a technical term the first time you use it. No filler ("basically", "it is important to note"), no decorative metaphors.`;
 
-const CARD_WRITER = `You are Flick's flashcard author. You write spaced-repetition cards that a student will review for years, so a badly worded card costs them confusion at every review.
+const CARD_WRITER = `You are Flick's card author. You turn study material into a set of spaced-repetition cards that a student will review for years. Each card is either a short-answer flashcard or an exam-style multiple-choice question; you pick the better type for each idea.
 
-Before writing, read the whole source and decide what is worth remembering: the core facts, the relationships between them, and the reasons that explain them. Skip filler, asides and anything trivial to look up. Cover the most important ideas first.
+${WRITING_GUIDE}
 
-Rules for every card:
-- One idea per card. If an answer has two parts a student could recall separately, make two cards.
-- The front asks one specific question with exactly one correct answer. Read it as someone who has forgotten the source: if a different answer would also be true, add constraints until only one fits. Never "Describe X" or "What do you know about X".
-- The front stands alone. It will appear months later, shuffled among other decks, so name the subject when terms could mean something else ("In TCP, ...", "In Kant's ethics, ..."). Never refer to "the text", "the author", "this study" or "the above".
-- The back is the short correct answer: ideally 1-8 words, never more than one sentence, answerable in under 10 seconds. Students may have to type it. Do not repeat words from the question in the answer.
-- No enumerations ("What are the five X?"). Write one card per item with a prompt that picks out that item ("Which stage of mitosis follows metaphase?").
-- No yes/no or true/false questions and no "Which is NOT" questions; ask an open question instead.
-- Where the source explains a mechanism or a reason, write "why" and "how" cards, not only "what" cards. They build understanding and make the factual cards easier to keep.
-- For an abstract idea, add a card that asks about a concrete example, and a card that separates it from the idea it is most often confused with. Word that card so the neighbouring concept is clearly a wrong answer.
-- Give numbers and dates context: say why the number matters.
-- "distractors": exactly 3 wrong answers for a multiple-choice version. Each one is the answer a student with a specific, common misunderstanding would give (a confusable term, a reversed cause and effect, a neighbouring value). Match the correct answer's type, length and style so it does not stand out. Never "All/None of the above".
-- "explanation": 1-2 sentences that give the reason the answer is right, or the distinction that rules out the most tempting wrong answer. Do not restate the answer.
+${PLAIN_ENGLISH}
+
+Field rules for every card:
+- "type": "flashcard" or "mcq".
+- "title": for a multiple-choice question, 2 to 6 words naming what it is about. For a flashcard, an empty string.
+- "question": the question text, with every assumption the answer depends on. Do not put code here.
+- "code": a code snippet when the card is about code, otherwise an empty string. "language": its language in lowercase (java, cpp, python, rust, sql, ...), otherwise an empty string.
+- "answer": the correct answer. For a flashcard, the short answer. For a multiple-choice question, the correct option.
+- "distractors": for a flashcard, exactly 3 wrong answers. For a multiple-choice question, the wrong options (2 to 7), each the answer one named misconception produces.
+- "hint": for a multiple-choice question, one sentence that points at the mechanism. For a flashcard, an empty string.
+- "explanation": as described above. Use Markdown: \`backticks\` for code, a "- " line per wrong option.
 - No duplicates and no trivia about the document itself (page numbers, slide authors).
-- Write in the same language as the source material.
-
-${PLAIN_ENGLISH}`;
-
-const MCQ_WRITER = `You are Flick's question author. You write hard, fair multiple-choice questions that test whether a student understands how something works, not whether they memorized a fact. Students review each question for months with spaced repetition.
-
-${MCQ_GUIDE}
-
-Field rules:
-- "title": 2 to 6 words naming what the question is about.
-- "question": the question text, with every assumption the answer depends on. Do not put the code here.
-- "code": the code snippet when the question is about code, otherwise an empty string. "language": its language in lowercase (java, cpp, python, rust, sql, ...), otherwise an empty string.
-- "answer": the correct option. "distractors": the wrong options (2 to 7), each the answer one named misconception produces.
-- "hint": one sentence that points at the mechanism without giving the answer away.
-- "explanation": the mechanism behind the correct answer (2 to 4 sentences), then one short line per wrong option, starting with the option in quotes, naming the belief that leads to it. Use Markdown: \`backticks\` for code, a "- " line per wrong option.
 - Write in the same language as the source material.`;
+
+/** Writes multiple-choice options for existing cards (used after a plain list import). */
+const DISTRACTOR_WRITER = `You are Flick's card author.
+
+${FLASHCARD_GUIDE}
+
+${EXPLANATION_GUIDE}`;
 
 export interface GeneratedCard {
   front: string;
@@ -53,7 +44,8 @@ export interface GeneratedCard {
   hint?: string;
 }
 
-interface GeneratedMcq {
+interface GeneratedItem {
+  type: 'flashcard' | 'mcq';
   title: string;
   question: string;
   code: string;
@@ -72,21 +64,10 @@ export interface GenerationResult {
   cards: GeneratedCard[];
 }
 
-const cardSchema = {
+const itemSchema = {
   type: 'object',
   properties: {
-    front: { type: 'string' },
-    back: { type: 'string' },
-    distractors: { type: 'array', items: { type: 'string' }, minItems: 3, maxItems: 3 },
-    explanation: { type: 'string' },
-  },
-  required: ['front', 'back', 'distractors', 'explanation'],
-  additionalProperties: false,
-};
-
-const mcqSchema = {
-  type: 'object',
-  properties: {
+    type: { type: 'string', enum: ['flashcard', 'mcq'] },
     title: { type: 'string' },
     question: { type: 'string' },
     code: { type: 'string' },
@@ -96,43 +77,53 @@ const mcqSchema = {
     hint: { type: 'string' },
     explanation: { type: 'string' },
   },
-  required: ['title', 'question', 'code', 'language', 'answer', 'distractors', 'hint', 'explanation'],
+  required: ['type', 'title', 'question', 'code', 'language', 'answer', 'distractors', 'hint', 'explanation'],
   additionalProperties: false,
 };
 
-function generationSchema(items: object) {
-  return {
-    type: 'object',
-    properties: {
-      deckTitle: { type: 'string', description: 'Short deck title (max 6 words)' },
-      emoji: { type: 'string', description: 'One emoji that represents the subject' },
-      description: { type: 'string', description: 'One-sentence deck description' },
-      materialTitle: { type: 'string', description: 'Short title for this source material' },
-      cards: { type: 'array', items },
-    },
-    required: ['deckTitle', 'emoji', 'description', 'materialTitle', 'cards'],
-    additionalProperties: false,
-  };
-}
+const generationSchema = {
+  type: 'object',
+  properties: {
+    deckTitle: { type: 'string', description: 'Short deck title (max 6 words)' },
+    emoji: { type: 'string', description: 'One emoji that represents the subject' },
+    description: { type: 'string', description: 'One-sentence deck description' },
+    materialTitle: { type: 'string', description: 'Short title for this source material' },
+    cards: { type: 'array', items: itemSchema },
+  },
+  required: ['deckTitle', 'emoji', 'description', 'materialTitle', 'cards'],
+  additionalProperties: false,
+};
 
 export interface GenerateInput {
   text?: string;
   topic?: string;
   url?: string;
   files?: { path: string; name: string }[];
-  count: number;
   focus?: string;
   level?: string;
   existingFronts: string[];
-  /** 'cards': short-answer flashcards. 'mcq': exam-style multiple choice, with code when it fits. */
-  style?: 'cards' | 'mcq';
   model: ModelChoice;
   thinking?: boolean;
 }
 
+/** Turn one item from Claude's structured output into card fields. */
+export function itemToCard(q: GeneratedItem): GeneratedCard {
+  const mcq = q.type === 'mcq';
+  const code = q.code?.trim() ? q.code : '';
+  return {
+    front: q.question,
+    back: q.answer,
+    distractors: mcq ? q.distractors : q.distractors.slice(0, 3),
+    explanation: q.explanation,
+    mcq,
+    title: mcq ? q.title : undefined,
+    code: code || undefined,
+    codeLang: code ? normalizeLang(q.language) : undefined,
+    hint: mcq ? q.hint : undefined,
+  };
+}
+
 export async function generateCards(input: GenerateInput) {
-  const mcq = input.style === 'mcq';
-  const noun = mcq ? 'questions' : 'cards';
   const parts: string[] = [];
   const tools: string[] = [];
   const addDirs = new Set<string>();
@@ -140,7 +131,7 @@ export async function generateCards(input: GenerateInput) {
   if (input.files?.length) {
     tools.push('Read');
     parts.push(
-      `Source material is in these files. Read every one of them in full with the Read tool before writing ${noun}:\n` +
+      'Source material is in these files. Read every one of them in full with the Read tool before writing cards:\n' +
         input.files.map((f) => `- ${f.path}  (uploaded as "${f.name}")`).join('\n'),
     );
     for (const f of input.files) addDirs.add(f.path.replace(/[/\\][^/\\]+$/, ''));
@@ -154,44 +145,32 @@ export async function generateCards(input: GenerateInput) {
   }
   if (input.topic) {
     parts.push(
-      `There is no source document. Write ${noun} about this topic from your own knowledge, covering the fundamentals a student should know first:\n<topic>${input.topic}</topic>`,
+      `There is no source document. Write cards about this topic from your own knowledge, covering the fundamentals a student should know first:\n<topic>${input.topic}</topic>`,
     );
   }
-  parts.push(mcq ? `Write ${input.count} multiple-choice questions.` : `Write ${input.count} flashcards.`);
+  parts.push('Write as many cards as it takes to cover every idea worth remembering, mixing flashcards and multiple-choice questions as the guide describes.');
   if (input.focus) parts.push(`Focus on: ${input.focus}`);
   if (input.level) parts.push(`Target level: ${input.level}`);
   if (input.existingFronts.length) {
     parts.push(
-      'The deck already has these questions. Do not repeat them; cover new ground:\n' +
+      'The deck already has these questions. Do not repeat them; cover what they miss:\n' +
         input.existingFronts.slice(0, 200).map((f) => `- ${f}`).join('\n'),
     );
   }
   parts.push('Respond only with the structured output.');
 
-  const res = await callClaude<Omit<GenerationResult, 'cards'> & { cards: (GeneratedCard | GeneratedMcq)[] }>({
+  const res = await callClaude<Omit<GenerationResult, 'cards'> & { cards: GeneratedItem[] }>({
     prompt: parts.join('\n\n'),
-    system: mcq ? MCQ_WRITER : CARD_WRITER,
+    system: CARD_WRITER,
     model: input.model,
-    schema: generationSchema(mcq ? mcqSchema : cardSchema),
+    schema: generationSchema,
     tools,
     addDirs: [...addDirs],
-    timeoutMs: 360_000,
+    // Full coverage of a long chapter can mean 60+ cards, which takes a while to write.
+    timeoutMs: 600_000,
     thinking: input.thinking,
   });
-  const raw = res.data.cards ?? [];
-  const cards: GeneratedCard[] = mcq
-    ? (raw as GeneratedMcq[]).map((q) => ({
-        front: q.question,
-        back: q.answer,
-        distractors: q.distractors,
-        explanation: q.explanation,
-        mcq: true,
-        title: q.title,
-        code: q.code,
-        codeLang: q.code.trim() ? normalizeLang(q.language) : undefined,
-        hint: q.hint,
-      }))
-    : (raw as GeneratedCard[]);
+  const cards = (res.data.cards ?? []).map(itemToCard);
   return { ...res.data, cards: cards.filter((c) => c.front?.trim() && c.back?.trim()), costUsd: res.costUsd };
 }
 
@@ -255,7 +234,7 @@ export async function makeDistractors(opts: {
   model: ModelChoice;
 }) {
   const res = await callClaude<{ items: { id: string; distractors: string[]; explanation: string }[] }>({
-    system: CARD_WRITER,
+    system: DISTRACTOR_WRITER,
     prompt:
       'For each flashcard below write 3 distractors and a 1-2 sentence explanation. Each distractor is the answer a student with one specific, common misunderstanding would give, with the same type, length and style as the correct answer. Keep each id exactly.\n\n' +
       JSON.stringify(opts.cards),

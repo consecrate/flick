@@ -119,7 +119,7 @@ export const api = {
   resetCard: (id: string) => req<CardView>('POST', `/api/cards/${id}/reset`),
   deleteCard: (id: string) => req('DELETE', `/api/cards/${id}`),
   deleteMaterial: (id: string, withCards: boolean) => req('DELETE', `/api/materials/${id}${withCards ? '?cards=1' : ''}`),
-  generate: (b: { deckId?: string; source: SourceInput; count: number; focus?: string; level?: string; title?: string; style?: 'cards' | 'mcq' }) =>
+  generate: (b: { deckId?: string; source: SourceInput; focus?: string; level?: string; title?: string }) =>
     req<GenerateResult>('POST', '/api/generate', b),
   enhance: (deckId: string) => req<{ updated: number }>('POST', `/api/decks/${deckId}/enhance`),
   explain: (cardId: string, question?: string) => req<{ text: string }>('POST', '/api/explain', { cardId, question }),

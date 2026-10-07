@@ -1309,7 +1309,7 @@ main {
 }
 .gen-options {
   display: grid;
-  grid-template-columns: 1fr 1.4fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: var(--s3);
   margin-top: var(--s4);
 }
