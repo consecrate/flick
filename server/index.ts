@@ -308,7 +308,7 @@ app.post(
     if (source.type === 'mcq') {
       const { questions, errors } = parseMcqs(String(source.text ?? ''));
       if (!questions.length) {
-        throw new HttpError(400, errors.length ? `None of the ${errors.length} questions could be read. ${errors[0].title}: ${errors[0].message}.` : 'No questions found. Each question must start with a "## " title line.');
+        throw new HttpError(400, errors.length ? `${errors.length === 1 ? 'The question' : `None of the ${errors.length} questions`} could be read. ${errors[0].title}: ${errors[0].message}.` : 'No questions found. Each question must start with a "## " title line.');
       }
       deck ??= createDeck(String(b.title ?? '') || 'Imported questions', '🎯');
       const mat = addMaterial(deck.id, 'mcq', `Imported questions (${questions.length})`, questions.slice(0, 3).map((q) => q.title || q.question).join(' · '));
