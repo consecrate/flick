@@ -249,8 +249,8 @@ export function bossQueue(deckId: string | null, size = 10): Card[] {
   return shuffle(seen.sort((a, b) => score(b) - score(a)).slice(0, size));
 }
 
-export function practiceQueue(deckId: string | null, size: number): Card[] {
-  return shuffle(deckCards(deckId)).slice(0, size);
+export function practiceQueue(deckId: string | null, size: number, keep: (c: Card) => boolean = () => true): Card[] {
+  return shuffle(deckCards(deckId).filter(keep)).slice(0, size);
 }
 
 export const BOSS_MIN_CARDS = 4;

@@ -88,13 +88,19 @@ export type SourceInput =
   | { type: 'topic'; topic: string }
   | { type: 'url'; url: string }
   | { type: 'files'; files: { name: string; data: string }[] }
-  | { type: 'pairs'; text: string };
+  | { type: 'pairs'; text: string }
+  | { type: 'mcq'; text: string };
+
+/** Card fields the client may set when adding or editing a card. */
+export type CardFields = Pick<Card, 'front' | 'back'> & Partial<Pick<Card, 'distractors' | 'explanation' | 'mcq' | 'title' | 'code' | 'codeLang' | 'hint'>>;
 
 export interface GenerateResult {
   deck: DeckSummary;
   added: number;
   material: Material;
   needsDistractors?: boolean;
+  /** Questions in a bulk MCQ import that could not be read. */
+  skipped?: number;
   newAchievements: string[];
 }
 
@@ -106,14 +112,14 @@ export const api = {
   deck: (id: string) => req<DeckDetail>('GET', `/api/decks/${id}`),
   updateDeck: (id: string, d: Partial<{ title: string; emoji: string; description: string }>) => req<DeckSummary>('PATCH', `/api/decks/${id}`, d),
   deleteDeck: (id: string) => req('DELETE', `/api/decks/${id}`),
-  addCard: (deckId: string, c: { front: string; back: string; distractors?: string[]; explanation?: string }) =>
+  addCard: (deckId: string, c: CardFields) =>
     req<CardView>('POST', `/api/decks/${deckId}/cards`, c),
-  updateCard: (id: string, c: Partial<Pick<Card, 'front' | 'back' | 'distractors' | 'explanation' | 'starred' | 'suspended'>>) =>
+  updateCard: (id: string, c: Partial<CardFields> & Partial<Pick<Card, 'starred' | 'suspended'>>) =>
     req<CardView>('PATCH', `/api/cards/${id}`, c),
   resetCard: (id: string) => req<CardView>('POST', `/api/cards/${id}/reset`),
   deleteCard: (id: string) => req('DELETE', `/api/cards/${id}`),
   deleteMaterial: (id: string, withCards: boolean) => req('DELETE', `/api/materials/${id}${withCards ? '?cards=1' : ''}`),
-  generate: (b: { deckId?: string; source: SourceInput; count: number; focus?: string; level?: string; title?: string }) =>
+  generate: (b: { deckId?: string; source: SourceInput; count: number; focus?: string; level?: string; title?: string; style?: 'cards' | 'mcq' }) =>
     req<GenerateResult>('POST', '/api/generate', b),
   enhance: (deckId: string) => req<{ updated: number }>('POST', `/api/decks/${deckId}/enhance`),
   explain: (cardId: string, question?: string) => req<{ text: string }>('POST', '/api/explain', { cardId, question }),

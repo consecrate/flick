@@ -43,6 +43,20 @@ export interface Card {
   distractors: string[];
   /** Optional extra context shown after answering. */
   explanation?: string;
+  /**
+   * Exam-style multiple-choice question (bulk MCQ import, or Claude's MCQ
+   * style). Always asked as multiple choice with every one of its options,
+   * never as typed recall.
+   */
+  mcq?: boolean;
+  /** Short label shown above the question, e.g. "Calling a subclass method". */
+  title?: string;
+  /** Code snippet the question is about, shown under the question. */
+  code?: string;
+  /** Language of `code` for syntax highlighting, e.g. "java", "cpp", "python". */
+  codeLang?: string;
+  /** Optional nudge the student can open before answering. */
+  hint?: string;
   materialId?: string;
   createdAt: string;
   starred?: boolean;
@@ -59,7 +73,7 @@ export interface Deck {
   createdAt: string;
 }
 
-export type MaterialKind = 'text' | 'file' | 'url' | 'topic' | 'import';
+export type MaterialKind = 'text' | 'file' | 'url' | 'topic' | 'import' | 'mcq';
 
 export interface Material {
   id: string;

@@ -5,6 +5,7 @@ import { api, type CardView } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
 import { Icon } from '../components/icons.tsx';
 import { Mascot } from '../components/Mascot.tsx';
+import { CodeBlock, Inline, RichText } from '../components/Code.tsx';
 import { CountUp, Spinner } from '../components/ui.tsx';
 import { confetti, floatText } from '../fx.ts';
 import { sfx } from '../sound.ts';
@@ -31,6 +32,8 @@ function shuffle<T>(a: T[]): T[] {
  * strengthens memory more.
  */
 export function buildQuestion(card: CardView, pool: string[], opts: { mcqOnly?: boolean } = {}): Question {
+  // Exam-style questions always show every option the author wrote.
+  if (card.mcq) return { type: 'mcq', options: shuffle([card.back, ...card.distractors.filter((d) => d && d !== card.back)]) };
   let wrong = card.distractors.filter((d) => d && d !== card.back);
   if (wrong.length < 3) {
     const extra = shuffle(pool.filter((b) => b !== card.back && !wrong.includes(b)));
@@ -75,8 +78,9 @@ export function QuestionView({
   const [typed, setTyped] = useState('');
   const [removed, setRemoved] = useState<string[]>([]);
   const [hint, setHint] = useState<string | null>(null);
+  const [cardHint, setCardHint] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const usedHint = removed.length > 0 || hint !== null;
+  const usedHint = removed.length > 0 || hint !== null || cardHint;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -108,7 +112,9 @@ export function QuestionView({
   useEffect(() => {
     if (question.type !== 'mcq') return;
     const on = (e: KeyboardEvent) => {
-      const n = Number(e.key);
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Keys 1-9 pick the first nine options and 0 picks the tenth.
+      const n = e.key === '0' ? 10 : Number(e.key);
       if (n >= 1 && n <= question.options.length) pick(question.options[n - 1]);
     };
     window.addEventListener('keydown', on);
@@ -130,15 +136,27 @@ export function QuestionView({
   };
 
   const answered = chosen !== null;
+  // Long or numerous options read better as a left-aligned list than as centered pills.
+  const listOptions = question.type === 'mcq' && (question.options.length > 4 || question.options.some((o) => o.length > 48 || o.includes('`')));
+  const rich = !!(card.mcq || card.code || card.title);
 
   return (
     <div className={`question ${compact ? 'compact' : ''}`}>
-      <div className="q-card">
-        <div className="q-type">{question.type === 'mcq' ? '🎯 Choose the answer' : '⌨️ Type the answer'}</div>
-        <div className="q-front">{card.front}</div>
+      <div className={`q-card ${rich ? 'rich-q' : ''}`}>
+        <div className="q-type">
+          {question.type === 'mcq' ? '🎯 Choose the answer' : '⌨️ Type the answer'}
+          {card.title && <span className="q-title">{card.title}</span>}
+        </div>
+        {rich ? <RichText className="q-front" text={card.front} /> : <div className="q-front">{card.front}</div>}
+        {card.code && <CodeBlock code={card.code} lang={card.codeLang} />}
+        {card.hint && !answered && (
+          <button className={`card-hint ${cardHint ? 'open' : ''}`} onClick={() => setCardHint(true)} disabled={cardHint}>
+            💡 {cardHint ? <Inline text={card.hint} /> : 'Show hint'}
+          </button>
+        )}
       </div>
       {question.type === 'mcq' ? (
-        <div className="options">
+        <div className={`options ${listOptions ? 'list' : ''}`}>
           {question.options.map((o, i) => {
             let cls = 'option';
             if (removed.includes(o)) cls += ' removed';
@@ -146,8 +164,10 @@ export function QuestionView({
             else if (answered && o === chosen) cls += ' wrong';
             return (
               <button key={o + i} className={cls} disabled={answered || locked || removed.includes(o)} onClick={() => pick(o)}>
-                <span className="opt-key">{i + 1}</span>
-                <span>{o}</span>
+                <span className="opt-key">{i === 9 ? 0 : i + 1}</span>
+                <span className="opt-text">
+                  <Inline text={o} />
+                </span>
               </button>
             );
           })}
@@ -333,7 +353,9 @@ export function Feedback({
       {!outcome.correct && (
         <div className="feedback-answer">
           <span className="muted small">Correct answer</span>
-          <div>{card.back}</div>
+          <div>
+            <Inline text={card.back} />
+          </div>
         </div>
       )}
       {outcome.type === 'typed' && outcome.correct && outcome.given.trim().toLowerCase() !== card.back.trim().toLowerCase() && (
@@ -342,7 +364,7 @@ export function Feedback({
           <div>{card.back}</div>
         </div>
       )}
-      {card.explanation && <p className="feedback-expl">{card.explanation}</p>}
+      {card.explanation && <RichText className="feedback-expl" text={card.explanation} />}
       {appealNote && <p className="feedback-expl">⚖️ {appealNote}</p>}
       <div className="feedback-actions">
         <button className="btn ghost small" onClick={onExplain}>

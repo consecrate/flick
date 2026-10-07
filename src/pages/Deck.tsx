@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { MAX_OPTIONS } from '../../shared/mcq.ts';
 import { api, type CardView, type DeckDetail } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
+import { Inline } from '../components/Code.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
 import { ImportModal } from '../components/ImportModal.tsx';
 import { Icon } from '../components/icons.tsx';
@@ -41,7 +43,7 @@ export function DeckPage({ id }: { id: string }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = data?.cards ?? [];
-    return q ? list.filter((c) => c.front.toLowerCase().includes(q) || c.back.toLowerCase().includes(q)) : list;
+    return q ? list.filter((c) => [c.title, c.front, c.back, c.code].some((x) => x?.toLowerCase().includes(q))) : list;
   }, [data, query]);
 
   if (!data) {
@@ -52,7 +54,7 @@ export function DeckPage({ id }: { id: string }) {
     );
   }
   const d = data.deck;
-  const missingOptions = data.cards.filter((c) => c.distractors.length < 3).length;
+  const missingOptions = data.cards.filter((c) => !c.mcq && c.distractors.length < 3).length;
 
   const enhance = async () => {
     setEnhancing(true);
@@ -242,8 +244,17 @@ export function DeckPage({ id }: { id: string }) {
               {filtered.map((c) => (
                 <div key={c.id} className={`card-row ${c.suspended ? 'suspended' : ''}`}>
                   <div className="card-row-main" onClick={() => setEditing(c)}>
-                    <div className="card-front">{c.front}</div>
-                    <div className="card-back">{c.back}</div>
+                    <div className="card-front">
+                      {c.mcq && <span className="chip">🎯 {c.distractors.length + 1} options</span>}
+                      {c.code && <span className="chip">{'</>'} {c.codeLang ?? 'code'}</span>}
+                      <span>
+                        {c.title ? `${c.title}: ` : ''}
+                        {c.front}
+                      </span>
+                    </div>
+                    <div className="card-back">
+                      <Inline text={c.back} />
+                    </div>
                   </div>
                   <div className="card-row-meta">
                     <TierChip tier={c.tier} />
@@ -289,7 +300,7 @@ export function DeckPage({ id }: { id: string }) {
             <div key={m.id} className="card-row">
               <div className="card-row-main">
                 <div className="card-front">
-                  <span className="chip">{{ text: '📝 Notes', file: '📄 File', url: '🔗 Link', topic: '💭 Topic', import: '📥 List' }[m.kind]}</span>
+                  <span className="chip">{{ text: '📝 Notes', file: '📄 File', url: '🔗 Link', topic: '💭 Topic', import: '📥 List', mcq: '🎯 Questions' }[m.kind]}</span>
                   {m.title}
                 </div>
                 <div className="card-back muted">{m.preview}</div>
@@ -358,14 +369,24 @@ function CardEditor({ deckId, card, onClose, onSaved }: { deckId: string; card: 
   const { showError } = useApp();
   const [front, setFront] = useState(card?.front ?? '');
   const [back, setBack] = useState(card?.back ?? '');
-  const [d, setD] = useState<string[]>([0, 1, 2].map((i) => card?.distractors[i] ?? ''));
+  const [mcq, setMcq] = useState(card?.mcq ?? false);
+  const [d, setD] = useState<string[]>(() => {
+    const list = [...(card?.distractors ?? [])];
+    while (list.length < 3) list.push('');
+    return list;
+  });
   const [explanation, setExplanation] = useState(card?.explanation ?? '');
+  const [title, setTitle] = useState(card?.title ?? '');
+  const [code, setCode] = useState(card?.code ?? '');
+  const [codeLang, setCodeLang] = useState(card?.codeLang ?? '');
+  const [hint, setHint] = useState(card?.hint ?? '');
   const [busy, setBusy] = useState(false);
+  const maxWrong = mcq ? MAX_OPTIONS - 1 : 3;
 
   const save = async () => {
     setBusy(true);
     try {
-      const body = { front, back, distractors: d.filter((x) => x.trim()), explanation };
+      const body = { front, back, mcq, distractors: d.filter((x) => x.trim()).slice(0, maxWrong), explanation, title, code, codeLang, hint };
       if (card) await api.updateCard(card.id, body);
       else await api.addCard(deckId, body);
       onSaved();
@@ -387,21 +408,49 @@ function CardEditor({ deckId, card, onClose, onSaved }: { deckId: string; card: 
         <span>Answer</span>
         <input className="input" value={back} onChange={(e) => setBack(e.target.value)} />
       </label>
-      <label className="field">
-        <span>Wrong options for multiple choice (optional)</span>
-        {d.map((x, i) => (
+      <label className="check">
+        <input type="checkbox" checked={mcq} onChange={(e) => setMcq(e.target.checked)} />
+        <span>Always ask as multiple choice, with every option below</span>
+      </label>
+      <div className="field">
+        <span>Wrong options for multiple choice{mcq ? '' : ' (optional)'}</span>
+        {d.slice(0, Math.max(3, mcq ? d.length : 3)).map((x, i) => (
           <input key={i} className="input" value={x} placeholder={`Wrong option ${i + 1}`} onChange={(e) => setD(d.map((y, j) => (j === i ? e.target.value : y)))} />
         ))}
-      </label>
+        {mcq && d.length < maxWrong && (
+          <button className="link" onClick={() => setD([...d, ''])}>
+            + Add an option
+          </button>
+        )}
+      </div>
       <label className="field">
         <span>Explanation (optional)</span>
         <textarea className="input" rows={2} value={explanation} onChange={(e) => setExplanation(e.target.value)} />
       </label>
+      <details className="field more-fields" open={!!(card?.code || card?.title || card?.hint)}>
+        <summary>Title, code and hint</summary>
+        <label className="field">
+          <span>Title (optional)</span>
+          <input className="input" value={title} placeholder="e.g. Calling a subclass method" onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <label className="field">
+          <span>Code (optional)</span>
+          <textarea className="input mono" rows={5} value={code} onChange={(e) => setCode(e.target.value)} />
+        </label>
+        <label className="field">
+          <span>Code language</span>
+          <input className="input" value={codeLang} placeholder="java, cpp, python, rust…" onChange={(e) => setCodeLang(e.target.value)} />
+        </label>
+        <label className="field">
+          <span>Hint (optional)</span>
+          <input className="input" value={hint} onChange={(e) => setHint(e.target.value)} />
+        </label>
+      </details>
       <div className="modal-actions">
         <button className="btn ghost" onClick={onClose}>
           Cancel
         </button>
-        <button className="btn primary" disabled={busy || !front.trim() || !back.trim()} onClick={() => void save()}>
+        <button className="btn primary" disabled={busy || !front.trim() || !back.trim() || (mcq && !d.some((x) => x.trim()))} onClick={() => void save()}>
           Save
         </button>
       </div>
