@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ACHIEVEMENTS, SHOP } from '../shared/game.ts';
 import { ApiError, api, type AppState } from './api.ts';
 import { Icon } from './components/icons.tsx';
-import { setSoundEnabled, sfx } from './sound.ts';
+import { setSoundEnabled, setSoundVolume, sfx } from './sound.ts';
 
 // ---------- routing (hash based, so the server needs no rewrites) ----------
 
@@ -61,11 +61,14 @@ export function useAppState(): AppState {
 
 function applyTheme(themeId: string) {
   const item = SHOP.find((i) => i.id === themeId) ?? SHOP.find((i) => i.id === 'theme-midnight')!;
-  const [bg, surface, accent] = item.value as string[];
+  const [bg, surface, accent, ink] = item.value as string[];
   const root = document.documentElement.style;
   root.setProperty('--bg', bg);
   root.setProperty('--surface', surface);
   root.setProperty('--accent', accent);
+  root.setProperty('--ink', ink);
+  // Light text means a dark theme; native controls and scrollbars follow.
+  root.setProperty('color-scheme', parseInt(ink.slice(1, 3), 16) > 128 ? 'dark' : 'light');
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -81,6 +84,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLoadError(null);
       applyTheme(s.profile.theme);
       setSoundEnabled(s.settings.sound);
+      setSoundVolume(s.settings.soundVolume);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }

@@ -1,7 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { MASTERY_TIERS } from '../../shared/game.ts';
 import { navigate, useAppState, useRoute } from '../app-context.tsx';
 import { Icon } from './icons.tsx';
+import { Mascot, type Mood } from './Mascot.tsx';
+import { sfx } from '../sound.ts';
 
 export function ProgressBar({ value, max = 1, color, height = 10, className = '' }: { value: number; max?: number; color?: string; height?: number; className?: string }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
@@ -17,7 +19,7 @@ export function Ring({ value, size = 64, stroke = 7, color = 'var(--accent)', ch
   const c = 2 * Math.PI * r;
   const v = Math.max(0, Math.min(1, value));
   return (
-    <div className="ring" style={{ width: size, height: size }}>
+    <div className="ring" style={{ width: size, height: size, '--ring-c': c } as CSSProperties}>
       <svg width={size} height={size}>
         <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--track)" strokeWidth={stroke} fill="none" />
         <circle
@@ -41,6 +43,10 @@ export function Ring({ value, size = 64, stroke = 7, color = 'var(--accent)', ch
 
 export function Modal({ onClose, children, wide }: { onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
+    sfx.open();
+    return () => sfx.close();
+  }, []);
+  useEffect(() => {
     const on = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
@@ -57,14 +63,36 @@ export function Modal({ onClose, children, wide }: { onClose: () => void; childr
   );
 }
 
+// Last value each HUD counter showed, kept across remounts so coins earned in
+// a study session still pop when the top bar comes back.
+const seen = new Map<string, number | string>();
+
+/** A HUD number that pops when it changes (not on first load). */
+function Bump({ name, value }: { name: string; value: number | string }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const before = seen.get(name);
+    seen.set(name, value);
+    if (before !== undefined && before !== value) setN((k) => k + 1);
+  }, [name, value]);
+  return (
+    <b key={n} className={n ? 'bump' : undefined}>
+      {value}
+    </b>
+  );
+}
+
 export function TopBar() {
   const s = useAppState();
   const p = s.profile;
   const path = useRoute();
-  const link = (href: string, label: string) => {
+  const link = (href: string, emoji: string, label: string) => {
     const active = href === '/' ? path === '/' || path.startsWith('/deck') : path.startsWith(href);
     return (
       <a href={`#${href}`} aria-current={active ? 'page' : undefined}>
+        <span className="nav-emoji" aria-hidden="true">
+          {emoji}
+        </span>
         {label}
       </a>
     );
@@ -73,42 +101,44 @@ export function TopBar() {
     <header className="topbar">
       <button className="brand" onClick={() => navigate('/')}>
         <span className="brand-mark">
-          <Icon name="bolt" size={14} filled />
+          <Icon name="bolt" size={20} filled />
         </span>
         Flick
       </button>
       <nav className="nav">
-        {link('/', 'Decks')}
-        {link('/stats', 'Stats')}
-        {link('/achievements', 'Trophies')}
-        {link('/shop', 'Shop')}
-        {link('/settings', 'Settings')}
+        {link('/', '🏠', 'Decks')}
+        {link('/stats', '📊', 'Stats')}
+        {link('/achievements', '🏆', 'Trophies')}
+        {link('/shop', '🛍️', 'Shop')}
+        {link('/settings', '⚙️', 'Settings')}
       </nav>
       <div className="hud">
         <span className={`hud-item ${s.streakAtRisk ? 'at-risk' : ''}`} title={s.streakAtRisk ? 'Study today to keep your streak!' : 'Day streak'}>
-          <Icon name="flame" className={p.streak.current > 0 ? 'flame' : 'flame off'} /> <b>{p.streak.current}</b>
+          <span className={p.streak.current > 0 ? 'flame' : 'flame off'}>🔥</span> <Bump name="streak" value={p.streak.current} />
         </span>
         <span className="hud-item" title="Coins">
-          <Icon name="coin" /> <b>{p.coins}</b>
+          🪙 <Bump name="coins" value={p.coins} />
         </span>
         <span className="hud-item" title="Hints">
-          <Icon name="hint" /> <b>{p.hints}</b>
+          💡 <Bump name="hints" value={p.hints} />
         </span>
         {p.streak.freezes > 0 && (
           <span className="hud-item" title="Streak freezes">
-            <Icon name="freeze" /> <b>{p.streak.freezes}</b>
+            🧊 <Bump name="freezes" value={p.streak.freezes} />
           </span>
         )}
         {s.doubleXpActive && (
           <span className="hud-item boost" title="Double XP active">
-            <b>2× XP</b>
+            🚀 <b>2× XP</b>
           </span>
         )}
         <button className="hud-avatar" onClick={() => navigate('/settings')} title={`${p.name} · Level ${s.level.level}`}>
           <span className="avatar">{p.avatar}</span>
           <span className="hud-level">
-            <span>Lv {s.level.level}</span>
-            <ProgressBar value={s.level.into} max={s.level.needed} height={3} />
+            <span>
+              Lv <Bump name="level" value={s.level.level} />
+            </span>
+            <ProgressBar value={s.level.into} max={s.level.needed} height={6} />
           </span>
         </button>
       </div>
@@ -159,6 +189,7 @@ export function ClaudeLoader({ lines = LOADING_LINES }: { lines?: string[] }) {
   }, [lines.length]);
   return (
     <div className="loader">
+      <Mascot mood="wow" size={96} className="bob" />
       <div className="loader-orb" />
       <p className="loader-line">{lines[i]}</p>
       <p className="muted small">
@@ -173,19 +204,24 @@ export function Spinner() {
 }
 
 /** Animated number that counts up to `value`. */
-export function CountUp({ value, duration = 900 }: { value: number; duration?: number }) {
+export function CountUp({ value, duration = 900, delay = 0, sound = false }: { value: number; duration?: number; delay?: number; sound?: boolean }) {
   const [n, setN] = useState(0);
   useEffect(() => {
-    const start = performance.now();
+    const start = performance.now() + delay;
     let raf = 0;
+    let shown = 0;
+    let ticks = 0;
     const step = (t: number) => {
-      const k = Math.min(1, (t - start) / duration);
-      setN(Math.round(value * (1 - Math.pow(1 - k, 3))));
+      const k = Math.max(0, Math.min(1, (t - start) / duration));
+      const next = Math.round(value * (1 - Math.pow(1 - k, 3)));
+      if (sound && next !== shown) sfx.count(ticks++);
+      shown = next;
+      setN(next);
       if (k < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [value, duration]);
+  }, [value, duration, delay, sound]);
   return <>{n}</>;
 }
 
@@ -243,9 +279,10 @@ function inline(s: string): ReactNode[] {
   return out;
 }
 
-export function EmptyState({ icon, title, children }: { icon?: string; title: string; children?: ReactNode }) {
+export function EmptyState({ icon, mood, title, children }: { icon?: string; mood?: Mood; title: string; children?: ReactNode }) {
   return (
     <div className="empty">
+      {mood && <Mascot mood={mood} size={110} />}
       {icon && <div className="empty-icon">{icon}</div>}
       <h3>{title}</h3>
       {children}

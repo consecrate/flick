@@ -3,7 +3,8 @@ import { api } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
 import { ImportModal } from '../components/ImportModal.tsx';
 import { Icon } from '../components/icons.tsx';
-import { EmptyState, Modal, ProgressBar, Ring } from '../components/ui.tsx';
+import { PokeableMascot } from '../components/Mascot.tsx';
+import { CountUp, EmptyState, Modal, ProgressBar, Ring } from '../components/ui.tsx';
 import { confetti } from '../fx.ts';
 import { sfx } from '../sound.ts';
 
@@ -27,9 +28,9 @@ export function Home() {
   const openChest = async () => {
     try {
       const loot = await api.openChest();
-      sfx.victory();
-      confetti(180);
+      sfx.chest();
       setChestLoot(loot);
+      setTimeout(() => confetti(180), 380);
       announceAchievements(loot.newAchievements);
       await refresh();
     } catch (e) {
@@ -52,46 +53,49 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div className="hero-text">
-          <div className="eyebrow">
-            Level {s.level.level} · {s.level.title}
-          </div>
-          <h1>
-            {greeting()}, {p.name}
-          </h1>
-          <p className="muted">
-            {s.dueTotal > 0
-              ? `${s.dueTotal} card${s.dueTotal === 1 ? '' : 's'} due for review. `
-              : s.newTotal > 0
-                ? `${s.newTotal} new card${s.newTotal === 1 ? '' : 's'} ready to learn. `
-                : 'Nothing due right now. '}
-            {s.level.needed - s.level.into} XP to level {s.level.level + 1}.
-          </p>
-          {s.streakAtRisk && <p className="warn">Your {p.streak.current}-day streak ends at midnight. One quick session keeps it alive.</p>}
-          <div className="hero-actions">
-            <button className="btn primary big" disabled={s.dueTotal + s.newTotal === 0} onClick={() => navigate('/play/quiz/all')}>
-              {s.dueTotal + s.newTotal > 0 && <Icon name="play" filled size={14} />}
-              {s.dueTotal > 0 ? `Review ${s.dueTotal} due` : s.newTotal > 0 ? 'Learn new cards' : 'All caught up'}
-            </button>
-            <button className="btn big" onClick={() => setImporting(true)}>
-              <Icon name="plus" /> New deck
-            </button>
+          <PokeableMascot mood={s.dueTotal + s.newTotal > 0 ? 'happy' : 'sleepy'} size={150} />
+          <div className="hero-copy">
+            <div className="eyebrow">
+              {greeting()}, {p.name} {p.avatar}
+            </div>
+            <h1>{s.dueTotal + s.newTotal > 0 ? 'What shall we study?' : 'All caught up!'}</h1>
+            <p className="muted">
+              {s.dueTotal > 0
+                ? `${s.dueTotal} card${s.dueTotal === 1 ? '' : 's'} due for review. `
+                : s.newTotal > 0
+                  ? `${s.newTotal} new card${s.newTotal === 1 ? '' : 's'} ready to learn. `
+                  : 'Nothing due right now. '}
+              {s.level.needed - s.level.into} XP to level {s.level.level + 1} ({s.level.title}).
+            </p>
+            {s.streakAtRisk && <p className="warn">🔥 Your {p.streak.current}-day streak ends at midnight. One quick session keeps it alive!</p>}
+            <div className="hero-actions">
+              <button className="btn primary big" disabled={s.dueTotal + s.newTotal === 0} onClick={() => navigate('/play/quiz/all')}>
+                {s.dueTotal + s.newTotal > 0 && <Icon name="play" filled size={14} />}
+                {s.dueTotal > 0 ? `Review ${s.dueTotal} due` : s.newTotal > 0 ? 'Learn new cards' : 'All caught up'}
+              </button>
+              <button className="btn big" onClick={() => setImporting(true)}>
+                <Icon name="plus" /> New deck
+              </button>
+            </div>
           </div>
         </div>
         <div className="goal-card">
-          <Ring value={goalPct} size={96} stroke={6} color={goalPct >= 1 ? 'var(--good)' : 'var(--accent)'}>
-            <div className="goal-num">{s.todayXp}</div>
-            <div className="muted small num">/ {goal}</div>
+          <Ring value={goalPct} size={124} stroke={14} color={goalPct >= 1 ? 'var(--good)' : 'var(--accent)'}>
+            <div className="goal-num">
+              <CountUp value={s.todayXp} />
+            </div>
+            <div className="muted small num">/ {goal} XP</div>
           </Ring>
           <div>
             <div className="goal-title">Daily goal</div>
             {s.chestAvailable ? (
               <button className="btn chest-btn" onClick={() => void openChest()}>
-                <Icon name="gift" /> Open chest
+                🎁 Open chest
               </button>
             ) : s.chestOpenedToday ? (
-              <p className="muted small">Chest opened. See you tomorrow.</p>
+              <p className="muted small">Chest opened. See you tomorrow! 👋</p>
             ) : (
-              <p className="muted small">Earn {Math.max(0, goal - s.todayXp)} more XP today to unlock a chest of coins and hints.</p>
+              <p className="muted small">{Math.max(0, goal - s.todayXp)} more XP to unlock today’s treasure chest 🎁</p>
             )}
           </div>
         </div>
@@ -117,12 +121,10 @@ export function Home() {
                   <ProgressBar value={q.progress} max={q.target} height={4} />
                 </div>
                 {q.claimed ? (
-                  <span className="muted small">
-                    <Icon name="check" /> Claimed
-                  </span>
+                  <span className="chip">✓ Claimed</span>
                 ) : (
                   <button className={`btn small ${done ? 'primary' : 'ghost'}`} disabled={!done} onClick={() => void claim(q.id)} title="Coin reward">
-                    <Icon name="coin" /> {q.reward}
+                    🪙 {q.reward}
                   </button>
                 )}
               </div>
@@ -135,9 +137,9 @@ export function Home() {
             <span className="muted small">Practice for XP. Doesn’t affect scheduling.</span>
           </div>
           <div className="arcade-grid">
-            <ArcadeTile name="Match" desc="Pair terms against the clock" disabled={!s.decks.some((d) => d.cardCount >= 3)} onClick={() => navigate('/play/match/all')} />
-            <ArcadeTile name="Time Attack" desc="As many answers as you can in 60 seconds" disabled={!s.decks.some((d) => d.cardCount >= 4)} onClick={() => navigate('/play/timeattack/all')} />
-            <ArcadeTile name="Boss Fight" desc="Battle your hardest cards" disabled={!s.decks.some((d) => d.bossReady)} onClick={() => navigate('/play/boss/all')} />
+            <ArcadeTile icon="🧩" name="Match" desc="Pair terms against the clock" disabled={!s.decks.some((d) => d.cardCount >= 3)} onClick={() => navigate('/play/match/all')} />
+            <ArcadeTile icon="⏱️" name="Time Attack" desc="60 seconds. Go!" disabled={!s.decks.some((d) => d.cardCount >= 4)} onClick={() => navigate('/play/timeattack/all')} />
+            <ArcadeTile icon="⚔️" name="Boss Fight" desc="Battle your hardest cards" disabled={!s.decks.some((d) => d.bossReady)} onClick={() => navigate('/play/boss/all')} />
           </div>
         </div>
       </section>
@@ -150,10 +152,10 @@ export function Home() {
           </button>
         </div>
         {s.decks.length === 0 ? (
-          <EmptyState title="No decks yet">
+          <EmptyState mood="wow" title="No decks yet">
             <p className="muted">Upload a PDF, paste notes, drop a link, or just name a topic. Claude writes the cards.</p>
             <button className="btn primary big" onClick={() => setImporting(true)}>
-              Create your first deck
+              ✨ Create your first deck
             </button>
           </EmptyState>
         ) : (
@@ -187,25 +189,13 @@ export function Home() {
       {chestLoot && (
         <Modal onClose={() => setChestLoot(null)}>
           <div className="center">
-            <div className="chest-open">
-              <Icon name="gift" size={28} />
-            </div>
-            <h2>Chest opened</h2>
-            <p className="loot">
-              <Icon name="coin" /> +{chestLoot.coins} coins
-            </p>
-            {chestLoot.hints > 0 && (
-              <p className="loot">
-                <Icon name="hint" /> +{chestLoot.hints} hints
-              </p>
-            )}
-            {chestLoot.freeze && (
-              <p className="loot">
-                <Icon name="freeze" /> +1 streak freeze
-              </p>
-            )}
+            <div className="chest-open">🎁</div>
+            <h2>Treasure!</h2>
+            <p className="loot">🪙 +{chestLoot.coins} coins</p>
+            {chestLoot.hints > 0 && <p className="loot">💡 +{chestLoot.hints} hints</p>}
+            {chestLoot.freeze && <p className="loot">🧊 +1 streak freeze</p>}
             <button className="btn primary big" onClick={() => setChestLoot(null)}>
-              Done
+              Sweet!
             </button>
           </div>
         </Modal>
@@ -214,12 +204,12 @@ export function Home() {
   );
 }
 
-function ArcadeTile({ name, desc, onClick, disabled }: { name: string; desc: string; onClick: () => void; disabled?: boolean }) {
+function ArcadeTile({ icon, name, desc, onClick, disabled }: { icon: string; name: string; desc: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button className="arcade-tile" onClick={onClick} disabled={disabled} title={disabled ? 'Study a few cards first to unlock' : undefined}>
+      <span className="arcade-icon">{icon}</span>
       <span className="arcade-name">{name}</span>
-      <Icon name={disabled ? 'lock' : 'play'} filled={!disabled} size={12} />
-      <span className="muted small">{disabled ? 'Study a deck first' : desc}</span>
+      <span className="muted small">{disabled ? '🔒 Study a deck first' : desc}</span>
     </button>
   );
 }

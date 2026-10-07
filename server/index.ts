@@ -564,6 +564,7 @@ app.patch('/api/settings', (req, res) => {
   if (typeof b.dailyGoalXp === 'number') s.dailyGoalXp = Math.max(20, Math.min(2000, Math.round(b.dailyGoalXp)));
   if (typeof b.maxIntervalDays === 'number') s.maxIntervalDays = Math.max(7, Math.min(36500, Math.round(b.maxIntervalDays)));
   if (typeof b.sound === 'boolean') s.sound = b.sound;
+  if (typeof b.soundVolume === 'number' && Number.isFinite(b.soundVolume)) s.soundVolume = Math.max(0, Math.min(1, b.soundVolume));
   if (typeof b.thinking === 'boolean') s.thinking = b.thinking;
   save();
   res.json(s);

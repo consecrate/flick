@@ -193,7 +193,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
               Cancel
             </button>
             <button className="btn primary big" disabled={!ready} onClick={() => void submit()}>
-              {tab === 'pairs' ? 'Import cards' : 'Generate flashcards'}
+              {tab === 'pairs' ? 'Import cards' : '✨ Generate flashcards'}
             </button>
           </div>
         </>

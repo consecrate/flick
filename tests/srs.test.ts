@@ -10,6 +10,7 @@ const settings: Settings = {
   sessionSize: 12,
   dailyGoalXp: 150,
   sound: false,
+  soundVolume: 0.7,
   maxIntervalDays: 365,
   thinking: false,
 };

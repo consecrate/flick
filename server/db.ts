@@ -64,6 +64,7 @@ export function defaultSettings(): Settings {
     sessionSize: 12,
     dailyGoalXp: 150,
     sound: true,
+    soundVolume: 0.7,
     maxIntervalDays: 365,
     thinking: false,
   };

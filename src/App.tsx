@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AppProvider, navigate, useApp, useRoute } from './app-context.tsx';
 import { TopBar } from './components/ui.tsx';
+import { sfx } from './sound.ts';
 import { Achievements } from './pages/Achievements.tsx';
 import { DeckPage } from './pages/Deck.tsx';
 import { Home } from './pages/Home.tsx';
@@ -13,7 +14,34 @@ import { Match } from './play/Match.tsx';
 import { Quiz } from './play/Quiz.tsx';
 import { TimeAttack } from './play/TimeAttack.tsx';
 
+// Controls that play their own sound (answers, ratings, tiles) are left out.
+const QUIET = '.option, .rate-btn, .match-tile, .flip-card, .mascot-btn, [data-quiet]';
+
+/** One listener gives every button, link and switch a soft sound. */
+function useUiSounds() {
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>('button, a[href], [role="button"]');
+      if (!el || el.closest(QUIET) || (el as HTMLButtonElement).disabled) return;
+      if (el.closest('.nav')) sfx.nav();
+      else sfx.tap();
+    };
+    const onChange = (e: Event) => {
+      const el = e.target as HTMLInputElement;
+      if (el.type === 'checkbox') sfx.toggle(el.checked);
+      else if (el.tagName === 'SELECT') sfx.tap();
+    };
+    document.addEventListener('click', onClick);
+    document.addEventListener('change', onChange);
+    return () => {
+      document.removeEventListener('click', onClick);
+      document.removeEventListener('change', onChange);
+    };
+  }, []);
+}
+
 function Routes() {
+  useUiSounds();
   const path = useRoute();
   const { refresh } = useApp();
   const parts = path.split('/').filter(Boolean);
@@ -49,7 +77,11 @@ function Routes() {
   return (
     <>
       <TopBar />
-      <main>{page}</main>
+      <main>
+        <div key={parts.slice(0, 2).join('/')} className="route">
+          {page}
+        </div>
+      </main>
     </>
   );
 }

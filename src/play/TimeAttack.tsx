@@ -104,7 +104,7 @@ function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart
         {reward ? (
           <Results
             reward={reward}
-            title={`Score: ${score}`}
+            title={`⏱️ Score: ${score}`}
             subtitle={reward.newRecord ? undefined : `Personal best: ${s.profile.stats.timeAttackBest}`}
             deckId={deckId}
             stats={[
@@ -127,6 +127,7 @@ function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart
     return (
       <div className="play">
         <div className="results">
+          <div className="boss-intro">⏱️</div>
           <h1>Time Attack</h1>
           <p className="muted">
             60 seconds on the clock. Correct answers add 1s, wrong ones cost 3s. Keys 1–4 answer fast.
@@ -147,7 +148,7 @@ function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart
                 setStarted(true);
               }}
             >
-              Start
+              Start!
             </button>
           </div>
         </div>

@@ -161,22 +161,27 @@ export function DeckPage({ id }: { id: string }) {
 
         <div className="modes">
           <button className="mode-btn primary" disabled={!enough} onClick={() => navigate(`/play/quiz/${d.id}`)}>
+            <span className="mode-icon">🎯</span>
             <span className="mode-name">Quiz</span>
             <span className="mode-desc">{d.dueCount + d.newCount > 0 ? `${d.dueCount} due · ${d.newCount} new` : 'Practice ahead'}</span>
           </button>
           <button className="mode-btn" disabled={!enough} onClick={() => navigate(`/play/flashcards/${d.id}`)}>
+            <span className="mode-icon">🃏</span>
             <span className="mode-name">Flashcards</span>
             <span className="mode-desc">Flip & self-rate</span>
           </button>
           <button className="mode-btn" disabled={d.cardCount < 3} onClick={() => navigate(`/play/match/${d.id}`)}>
+            <span className="mode-icon">🧩</span>
             <span className="mode-name">Match</span>
             <span className="mode-desc">Beat the clock</span>
           </button>
           <button className="mode-btn" disabled={d.cardCount < 4} onClick={() => navigate(`/play/timeattack/${d.id}`)}>
+            <span className="mode-icon">⏱️</span>
             <span className="mode-name">Time Attack</span>
             <span className="mode-desc">60-second blitz</span>
           </button>
           <button className="mode-btn boss" disabled={!d.bossReady} onClick={() => navigate(`/play/boss/${d.id}`)}>
+            <span className="mode-icon">⚔️</span>
             <span className="mode-name">Boss Fight</span>
             <span className="mode-desc">
               {d.bossReady ? (
@@ -193,10 +198,10 @@ export function DeckPage({ id }: { id: string }) {
 
       <div className="tabs">
         <button className={`tab ${tab === 'cards' ? 'active' : ''}`} onClick={() => setTab('cards')}>
-          Cards <span className="num">{data.cards.length}</span>
+          🃏 Cards <span className="num">{data.cards.length}</span>
         </button>
         <button className={`tab ${tab === 'materials' ? 'active' : ''}`} onClick={() => setTab('materials')}>
-          Materials <span className="num">{data.materials.length}</span>
+          📚 Materials <span className="num">{data.materials.length}</span>
         </button>
         <div className="grow" />
         <button className="btn ghost" onClick={() => setEditing('new')}>
@@ -219,7 +224,7 @@ export function DeckPage({ id }: { id: string }) {
                     {missingOptions} card{missingOptions === 1 ? '' : 's'} have no multiple-choice options yet.
                   </span>
                   <button className="btn small primary" onClick={() => void enhance()}>
-                    Write quiz options with Claude
+                    🧠 Write quiz options with Claude
                   </button>
                 </>
               )}
@@ -227,9 +232,9 @@ export function DeckPage({ id }: { id: string }) {
           )}
           {data.cards.length > 6 && <input className="input search" placeholder="Search cards…" value={query} onChange={(e) => setQuery(e.target.value)} />}
           {data.cards.length === 0 ? (
-            <EmptyState title="This deck is empty">
+            <EmptyState mood="wow" title="This deck is empty">
               <button className="btn primary" onClick={() => setImporting(true)}>
-                Generate cards from material
+                ✨ Generate cards from material
               </button>
             </EmptyState>
           ) : (
@@ -276,7 +281,7 @@ export function DeckPage({ id }: { id: string }) {
       {tab === 'materials' && (
         <div className="card-list">
           {data.materials.length === 0 && (
-            <EmptyState title="No materials yet">
+            <EmptyState mood="sleepy" title="No materials yet">
               <p className="muted">Add PDFs, notes, links or topics. Each one adds new cards to this deck.</p>
             </EmptyState>
           )}
@@ -284,7 +289,7 @@ export function DeckPage({ id }: { id: string }) {
             <div key={m.id} className="card-row">
               <div className="card-row-main">
                 <div className="card-front">
-                  <span className="chip">{{ text: 'Notes', file: 'File', url: 'Link', topic: 'Topic', import: 'List' }[m.kind]}</span>
+                  <span className="chip">{{ text: '📝 Notes', file: '📄 File', url: '🔗 Link', topic: '💭 Topic', import: '📥 List' }[m.kind]}</span>
                   {m.title}
                 </div>
                 <div className="card-back muted">{m.preview}</div>

@@ -72,7 +72,7 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
   const click = (t: Tile, el: HTMLElement) => {
     if (cleared.has(t.key) || finalMs !== null) return;
     if (!selected) {
-      sfx.click();
+      sfx.select();
       setSelected(t);
       return;
     }
@@ -124,7 +124,7 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
       <div className="play">
         <Results
           reward={reward}
-          title={`Cleared in ${fmt(finalMs)}`}
+          title={`🧩 Cleared in ${fmt(finalMs)}!`}
           subtitle={best !== null && !reward.newRecord ? `Personal best: ${fmt(best)}` : undefined}
           deckId={deckId}
           stats={[

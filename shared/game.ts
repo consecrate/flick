@@ -255,7 +255,7 @@ export interface ShopItem {
   desc: string;
   icon: string;
   price: number;
-  /** For themes: [background, surface, accent]. For avatars: the emoji. */
+  /** For themes: [background, surface, accent, ink (text)]. For avatars: the emoji. */
   value?: string | string[];
   max?: number;
 }
@@ -264,12 +264,14 @@ export const SHOP: ShopItem[] = [
   { id: 'freeze', kind: 'consumable', name: 'Streak Freeze', desc: 'Protects your streak for one missed day. Hold up to 3.', icon: '🧊', price: 60, max: 3 },
   { id: 'hints5', kind: 'consumable', name: 'Hint Pack', desc: '+5 hints. Use them for 50/50 or letter reveals.', icon: '💡', price: 30 },
   { id: 'double-xp', kind: 'boost', name: 'Double XP (15 min)', desc: 'Every XP you earn is doubled for 15 minutes.', icon: '🚀', price: 80 },
-  { id: 'theme-midnight', kind: 'theme', name: 'Midnight', desc: 'Graphite with a blue accent. The default.', icon: '🌌', price: 0, value: ['#0e0f11', '#16171a', '#7aa2f7'] },
-  { id: 'theme-sunset', kind: 'theme', name: 'Sunset', desc: 'Warm greys with a coral accent.', icon: '🌅', price: 120, value: ['#110f0e', '#1a1716', '#e9866a'] },
-  { id: 'theme-forest', kind: 'theme', name: 'Forest', desc: 'Green-grey with a sage accent.', icon: '🌲', price: 120, value: ['#0d100e', '#151916', '#7cc49a'] },
-  { id: 'theme-ocean', kind: 'theme', name: 'Ocean', desc: 'Blue-grey with a cyan accent.', icon: '🌊', price: 120, value: ['#0c0f12', '#13181d', '#5ab8de'] },
-  { id: 'theme-candy', kind: 'theme', name: 'Candy', desc: 'Plum greys with a pink accent.', icon: '🍬', price: 200, value: ['#110e12', '#1a161b', '#e08cbd'] },
-  { id: 'theme-gold', kind: 'theme', name: 'Gold Rush', desc: 'Warm black with a gold accent.', icon: '🏆', price: 400, value: ['#100f0c', '#191813', '#dcae4e'] },
+  // 'theme-midnight' keeps its id because it is every existing profile's default theme; it is the light default now.
+  { id: 'theme-midnight', kind: 'theme', name: 'Daylight', desc: 'Bright and friendly, with a violet pop. The default.', icon: '☀️', price: 0, value: ['#f4f5fb', '#ffffff', '#6c5cff', '#191f33'] },
+  { id: 'theme-night', kind: 'theme', name: 'Midnight', desc: 'The same look after dark.', icon: '🌙', price: 0, value: ['#121320', '#1c1e2d', '#8f82ff', '#eef0fa'] },
+  { id: 'theme-ocean', kind: 'theme', name: 'Lagoon', desc: 'Fresh teal, like a summer pool.', icon: '🌊', price: 120, value: ['#edf9f8', '#ffffff', '#12b8a6', '#10272a'] },
+  { id: 'theme-sunset', kind: 'theme', name: 'Sunset', desc: 'Warm peach with a tangerine pop.', icon: '🌅', price: 120, value: ['#fff5f0', '#ffffff', '#ff6a3d', '#2b1a14'] },
+  { id: 'theme-forest', kind: 'theme', name: 'Forest', desc: 'Leafy greens for calm focus.', icon: '🌲', price: 120, value: ['#f1f8f2', '#ffffff', '#1fae62', '#14261c'] },
+  { id: 'theme-candy', kind: 'theme', name: 'Candy', desc: 'Bubblegum pink, no sugar crash.', icon: '🍬', price: 200, value: ['#fdf2f8', '#ffffff', '#ec4899', '#2b1424'] },
+  { id: 'theme-gold', kind: 'theme', name: 'Gold Rush', desc: 'For the high rollers.', icon: '🏆', price: 400, value: ['#fffaea', '#ffffff', '#e9a100', '#2a2108'] },
   { id: 'avatar-fox', kind: 'avatar', name: 'Fox', desc: 'Clever and quick.', icon: '🦊', price: 50, value: '🦊' },
   { id: 'avatar-owl', kind: 'avatar', name: 'Owl', desc: 'Wise night studier.', icon: '🦉', price: 50, value: '🦉' },
   { id: 'avatar-octopus', kind: 'avatar', name: 'Octopus', desc: 'Eight arms, eight cards at once.', icon: '🐙', price: 80, value: '🐙' },
