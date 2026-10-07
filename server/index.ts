@@ -168,9 +168,9 @@ app.get('/api/state', (req, res) => {
 
 app.post('/api/decks', (req, res) => {
   const deck = createDeck(String(req.body.title ?? ''), req.body.emoji, String(req.body.description ?? ''));
-  checkAchievements(db.profile);
+  const newAchievements = checkAchievements(db.profile);
   save();
-  res.json(summarizeDeck(deck.id));
+  res.json({ ...summarizeDeck(deck.id), newAchievements });
 });
 
 app.get(

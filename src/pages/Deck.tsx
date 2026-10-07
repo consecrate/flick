@@ -80,7 +80,8 @@ export function DeckPage({ id }: { id: string }) {
   };
 
   const remove = async () => {
-    if (!confirm(`Delete “${d.title}” and all ${d.cardCount} cards? This cannot be undone.`)) return;
+    const what = d.cardCount ? `“${d.title}” and all ${d.cardCount} cards` : `“${d.title}”`;
+    if (!confirm(`Delete ${what}? This cannot be undone.`)) return;
     try {
       await api.deleteDeck(d.id);
       await refresh();
@@ -165,7 +166,7 @@ export function DeckPage({ id }: { id: string }) {
           <button className="mode-btn primary" disabled={!enough} onClick={() => navigate(`/play/quiz/${d.id}`)}>
             <span className="mode-icon">🎯</span>
             <span className="mode-name">Quiz</span>
-            <span className="mode-desc">{d.dueCount + d.newCount > 0 ? `${d.dueCount} due · ${d.newCount} new` : 'Practice ahead'}</span>
+            <span className="mode-desc">{!enough ? 'Add cards first' : d.dueCount + d.newCount > 0 ? `${d.dueCount} due · ${d.newCount} new` : 'Practice ahead'}</span>
           </button>
           <button className="mode-btn" disabled={!enough} onClick={() => navigate(`/play/flashcards/${d.id}`)}>
             <span className="mode-icon">🃏</span>
@@ -234,10 +235,16 @@ export function DeckPage({ id }: { id: string }) {
           )}
           {data.cards.length > 6 && <input className="input search" placeholder="Search cards…" value={query} onChange={(e) => setQuery(e.target.value)} />}
           {data.cards.length === 0 ? (
-            <EmptyState mood="wow" title="This deck is empty">
-              <button className="btn primary" onClick={() => setImporting(true)}>
-                ✨ Generate cards from material
-              </button>
+            <EmptyState mood="wow" title="No cards yet">
+              <p className="muted">Write cards yourself, or add notes, a PDF, a link or a topic and Claude writes them.</p>
+              <div className="row center-row">
+                <button className="btn" onClick={() => setEditing('new')}>
+                  <Icon name="plus" /> Write a card
+                </button>
+                <button className="btn primary" onClick={() => setImporting(true)}>
+                  ✨ Add material
+                </button>
+              </div>
             </EmptyState>
           ) : (
             <div className="card-list">

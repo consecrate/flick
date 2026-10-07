@@ -4,7 +4,7 @@ import type { Reward } from '../../shared/types.ts';
 import { api, type CardView, type StudyData } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
-import { Spinner } from '../components/ui.tsx';
+import { EmptyState, Spinner } from '../components/ui.tsx';
 import { confetti, floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { ComboMeter, Feedback, Hearts, PlayHeader, QuestionView, Results, buildQuestion, useSession, type AnswerOutcome } from './common.tsx';
@@ -100,6 +100,19 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
     return (
       <div className="play center">
         <Spinner />
+      </div>
+    );
+  }
+
+  if (data.cards.length === 0) {
+    return (
+      <div className="play center">
+        <EmptyState mood="sleepy" title="No cards to fight yet">
+          <p className="muted">Add some cards and study them first, then come back.</p>
+          <button className="btn primary" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+            {deckId ? 'Back to deck' : 'Home'}
+          </button>
+        </EmptyState>
       </div>
     );
   }
