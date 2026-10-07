@@ -10,6 +10,15 @@ concurrency:
   group: desktop-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Every build gets its own version so installed apps can tell it is newer.
+  VERSION: 0.1.${{ github.run_number }}
+  # Updater signing key (see "Auto-updates" in the README). Without it the
+  # workflow still builds .dmg files, but publishes no update.
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+  TAURI_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
+
 jobs:
   macos:
     name: macOS (${{ matrix.arch }})
@@ -20,9 +29,11 @@ jobs:
         include:
           - arch: Apple Silicon
             target: aarch64-apple-darwin
+            platform: darwin-aarch64
             artifact: Flick-macOS-AppleSilicon
           - arch: Intel
             target: x86_64-apple-darwin
+            platform: darwin-x86_64
             artifact: Flick-macOS-Intel
     steps:
       - uses: actions/checkout@v4
@@ -45,11 +56,80 @@ jobs:
 
       - run: npm ci
 
+      - name: Write build config
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -n "$TAURI_UPDATER_PUBKEY" ]; then
+            jq -n --arg v "$VERSION" --arg k "$TAURI_UPDATER_PUBKEY" \
+              '{version: $v, bundle: {createUpdaterArtifacts: true}, plugins: {updater: {pubkey: $k}}}' > build-config.json
+          else
+            echo "::notice::No updater signing key set, so this build will not publish an update."
+            jq -n --arg v "$VERSION" '{version: $v}' > build-config.json
+          fi
+
       # beforeBuildCommand builds the UI and compiles the server for the target.
-      - run: npx tauri build --target ${{ matrix.target }} --bundles app,dmg
+      - run: npx tauri build --target ${{ matrix.target }} --bundles app,dmg --config build-config.json
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
           if-no-files-found: error
+
+      - name: Collect update bundle
+        if: env.TAURI_SIGNING_PRIVATE_KEY != ''
+        run: |
+          mkdir -p update
+          dir=src-tauri/target/${{ matrix.target }}/release/bundle
+          cp "$dir/macos/Flick.app.tar.gz" "update/Flick-${{ matrix.platform }}.app.tar.gz"
+          cp "$dir/macos/Flick.app.tar.gz.sig" "update/Flick-${{ matrix.platform }}.app.tar.gz.sig"
+          cp "$dir"/dmg/*.dmg "update/${{ matrix.artifact }}.dmg"
+
+      - uses: actions/upload-artifact@v4
+        if: env.TAURI_SIGNING_PRIVATE_KEY != ''
+        with:
+          name: update-${{ matrix.platform }}
+          path: update/*
+          if-no-files-found: error
+
+  # Publishes a GitHub Release that installed apps update from.
+  release:
+    needs: macos
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check for signing key
+        id: key
+        run: echo "present=$([ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        if: steps.key.outputs.present == 'yes'
+        with:
+          pattern: update-*
+          path: update
+          merge-multiple: true
+
+      - name: Publish release
+        if: steps.key.outputs.present == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          tag="v$VERSION"
+          base="https://github.com/${{ github.repository }}/releases/download/$tag"
+          notes="$(printf '%s' "${NOTES:-Manual build}" | head -n 1)"
+          jq -n --arg v "$VERSION" --arg notes "$notes" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg arm_sig "$(cat update/Flick-darwin-aarch64.app.tar.gz.sig)" \
+            --arg x64_sig "$(cat update/Flick-darwin-x86_64.app.tar.gz.sig)" \
+            --arg base "$base" \
+            '{version: $v, notes: $notes, pub_date: $date, platforms: {
+                "darwin-aarch64": {signature: $arm_sig, url: ($base + "/Flick-darwin-aarch64.app.tar.gz")},
+                "darwin-x86_64": {signature: $x64_sig, url: ($base + "/Flick-darwin-x86_64.app.tar.gz")}
+              }}' > update/latest.json
+          gh release create "$tag" update/* \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Flick $VERSION" \
+            --notes "$notes" \
+            --latest

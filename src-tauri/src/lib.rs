@@ -9,9 +9,11 @@ use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use tauri::{Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_updater::UpdaterExt;
 
 /// Preferred port. A fixed port keeps the page origin (and so any browser
 /// storage) the same between launches. If it is taken we fall back to any
@@ -51,7 +53,7 @@ fn encode(s: &str) -> String {
         .collect()
 }
 
-fn show_error(app: &tauri::AppHandle, message: &str) {
+fn show_error(app: &AppHandle, message: &str) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.eval(&format!(
             "location.hash = 'error=' + {:?}; location.reload();",
@@ -60,7 +62,7 @@ fn show_error(app: &tauri::AppHandle, message: &str) {
     }
 }
 
-fn start_server(app: &tauri::AppHandle) -> Result<u16, String> {
+fn start_server(app: &AppHandle) -> Result<u16, String> {
     let port = pick_port();
     let ui_dir = app
         .path()
@@ -92,6 +94,58 @@ fn start_server(app: &tauri::AppHandle) -> Result<u16, String> {
     Ok(port)
 }
 
+/// How often a running app checks for a new version, besides at launch.
+const UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// Checks GitHub Releases for a newer signed build. If there is one, asks
+/// whether to install it now; on yes it downloads, installs and restarts.
+async fn check_for_update(app: AppHandle) -> Result<(), String> {
+    let Some(update) = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+    else {
+        return Ok(());
+    };
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .message(format!(
+            "Flick {} is available (you have {}). Update now? Flick will restart.",
+            update.version, update.current_version
+        ))
+        .title("Update available")
+        .buttons(MessageDialogButtons::OkCancelCustom("Update".into(), "Later".into()))
+        .show(move |yes| {
+            let _ = tx.send(yes);
+        });
+    if !rx.await.unwrap_or(false) {
+        return Ok(());
+    }
+
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    if let Some(child) = app.state::<Server>().0.lock().unwrap().take() {
+        let _ = child.kill();
+    }
+    app.restart();
+}
+
+fn start_update_checks(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            if let Err(e) = check_for_update(app.clone()).await {
+                eprintln!("Update check failed: {e}");
+            }
+            tokio::time::sleep(UPDATE_CHECK_INTERVAL).await;
+        }
+    });
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -103,6 +157,8 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Server(Mutex::new(None)))
         .setup(|app| {
             let handle = app.handle().clone();
@@ -144,6 +200,7 @@ pub fn run() {
                 }
                 Err(e) => show_error(&handle, &e),
             }
+            start_update_checks(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
