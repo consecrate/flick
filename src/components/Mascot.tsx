@@ -114,7 +114,13 @@ export function PokeableMascot({ mood = 'happy', size = 120 }: { mood?: Mood; si
     timer.current = window.setTimeout(() => setExcited(false), 900);
   };
   return (
-    <button type="button" className="mascot-btn" onClick={onPoke} aria-label="Poke Flicky">
+    <button
+      type="button"
+      data-quiet
+      className="shrink-0 rounded-lg transition-transform duration-250 ease-bounce outline-none hover:scale-104 hover:-rotate-4 focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      onClick={onPoke}
+      aria-label="Poke Flicky"
+    >
       <Mascot key={jumps} mood={excited ? 'wow' : mood} size={size} className={jumps ? 'jump' : 'hop-in'} />
     </button>
   );

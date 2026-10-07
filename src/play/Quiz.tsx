@@ -5,7 +5,9 @@ import { api, type CardView, type StudyData } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
 import { Mascot } from '../components/Mascot.tsx';
-import { EmptyState, ProgressBar, Spinner } from '../components/ui.tsx';
+import { EmptyState, ProgressBar, Spinner } from '../components/shared.tsx';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { type Scope, scopeHome } from '../scope.ts';
@@ -14,8 +16,12 @@ import {
   Feedback,
   Hearts,
   PlayHeader,
+  PlayShell,
+  PlaySub,
   QuestionView,
   Results,
+  ResultsActions,
+  ResultsColumn,
   buildQuestion,
   celebrateCorrect,
   useSession,
@@ -175,35 +181,30 @@ function QuizRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) 
 
   if (phase === 'loading') {
     return (
-      <div className="play center">
-        <Spinner />
-      </div>
+      <PlayShell center>
+        <Spinner className="size-6" />
+      </PlayShell>
     );
   }
 
   if (phase === 'empty') {
     return (
-      <div className="play">
-        <EmptyState mood="sleepy" title="All caught up!">
-          <p className="muted">FSRS says nothing is due right now. Coming back later is the most efficient way to remember.</p>
-          <div className="row center-row">
-            <button className="btn" onClick={() => navigate(scopeHome(scope))}>
-              Back
-            </button>
-            <button className="btn primary" onClick={() => void load(true)}>
-              Practice ahead anyway
-            </button>
-          </div>
-          <p className="muted small">Or play an arcade game for XP without touching your schedule.</p>
+      <PlayShell>
+        <EmptyState mood="sleepy" title="All caught up!" description="FSRS says nothing is due right now. Coming back later is the most efficient way to remember.">
+          <Button onClick={() => navigate(scopeHome(scope))}>Back</Button>
+          <Button variant="default" onClick={() => void load(true)}>
+            Practice ahead anyway
+          </Button>
+          <p className="w-full text-sm text-muted-foreground">Or play an arcade game for XP without touching your schedule.</p>
         </EmptyState>
-      </div>
+      </PlayShell>
     );
   }
 
   if (phase === 'done') {
     const t = session.tally.current;
     return (
-      <div className="play">
+      <PlayShell>
         <Results
           reward={reward}
           title={t.correct === t.answers && t.answers >= 5 ? '💎 Flawless!' : 'Session complete!'}
@@ -217,44 +218,44 @@ function QuizRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) 
           onAgain={onRestart}
           againLabel="Keep going"
         />
-      </div>
+      </PlayShell>
     );
   }
 
   if (phase === 'gameover') {
     return (
-      <div className="play">
-        <div className="results">
+      <PlayShell>
+        <ResultsColumn>
           <Mascot mood="sad" size={130} />
           <h1>Out of hearts</h1>
-          <p className="muted">Your progress so far is saved. Revive to finish the set, or wrap up here.</p>
-          <div className="results-actions">
-            <button className="btn big" onClick={() => void finish()}>
+          <p className="text-muted-foreground">Your progress so far is saved. Revive to finish the set, or wrap up here.</p>
+          <ResultsActions>
+            <Button size="lg" onClick={() => void finish()}>
               End session
-            </button>
-            <button className="btn primary big" disabled={s.profile.coins < REVIVE_COST} onClick={() => void revive()}>
+            </Button>
+            <Button variant="default" size="lg" disabled={s.profile.coins < REVIVE_COST} onClick={() => void revive()}>
               ❤️ Revive for 🪙 {REVIVE_COST}
-            </button>
-          </div>
-          {s.profile.coins < REVIVE_COST && <p className="muted small">You need {REVIVE_COST} coins to revive.</p>}
-        </div>
-      </div>
+            </Button>
+          </ResultsActions>
+          {s.profile.coins < REVIVE_COST && <p className="text-sm text-muted-foreground">You need {REVIVE_COST} coins to revive.</p>}
+        </ResultsColumn>
+      </PlayShell>
     );
   }
 
   return (
-    <div className="play">
+    <PlayShell>
       <PlayHeader onQuit={() => void quit()}>
-        <ProgressBar value={pos} max={queue.length} height={14} className="grow" />
+        <ProgressBar value={pos} max={queue.length} className="h-3.5 flex-1" />
         <Hearts n={hearts} max={QUIZ_HEARTS} />
       </PlayHeader>
-      <div className="play-sub">
+      <PlaySub>
         <ComboMeter combo={session.combo} />
-        {ahead && <span className="chip">Practicing ahead</span>}
-        {card.srs.state === 0 && <span className="chip new-chip">New card</span>}
-        <span className="muted small">+{session.xp} XP</span>
-      </div>
-      <div className="stage" ref={stageRef}>
+        {ahead && <Badge>Practicing ahead</Badge>}
+        {card.srs.state === 0 && <Badge variant="warning">New card</Badge>}
+        <span className="font-display font-semibold text-brand-ink">+{session.xp} XP</span>
+      </PlaySub>
+      <div className="mt-6" ref={stageRef}>
         {card && question && (
           <QuestionView key={`${card.id}:${pos}`} card={card} question={question} onAnswer={(o) => void onAnswer(o)} locked={phase !== 'question'} />
         )}
@@ -272,6 +273,6 @@ function QuizRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) 
         />
       )}
       {explain && <ExplainModal card={card} onClose={() => setExplain(false)} />}
-    </div>
+    </PlayShell>
   );
 }

@@ -3,10 +3,17 @@ import { ACHIEVEMENTS, SHOP, letterHint, matchAnswer, xpForAnswer } from '../../
 import type { Reward, StudyMode } from '../../shared/types.ts';
 import { api, type CardView } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
-import { Icon } from '../components/icons.tsx';
 import { Mascot } from '../components/Mascot.tsx';
-import { CodeBlock, Inline, RichText } from '../components/Code.tsx';
-import { CountUp, Spinner } from '../components/ui.tsx';
+import { CodeBlock } from '../components/Code.tsx';
+import { Markdown } from '../components/Markdown.tsx';
+import { CountUp, Spinner } from '../components/shared.tsx';
+import { XIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Kbd } from '@/components/ui/kbd';
+import { Tip } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { confetti, floatText } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { type Scope, scopeBackLabel, scopeDeckId, scopeHome } from '../scope.ts';
@@ -42,7 +49,8 @@ export function buildQuestion(card: CardView, pool: string[], opts: { mcqOnly?: 
   }
   const canMcq = wrong.length >= 2;
   const stable = card.srs.state === 2 && card.srs.stability >= 3;
-  const typable = card.back.length <= 80;
+  // Math and code are hard to type, so those answers stay multiple choice.
+  const typable = card.back.length <= 80 && !/[$`\\]/.test(card.back);
   if (!opts.mcqOnly && ((stable && typable) || !canMcq)) return { type: 'typed', options: [] };
   return { type: 'mcq', options: shuffle([card.back, ...wrong.slice(0, 3)]) };
 }
@@ -138,47 +146,74 @@ export function QuestionView({
 
   const answered = chosen !== null;
   // Long or numerous options read better as a left-aligned list than as centered pills.
-  const listOptions = question.type === 'mcq' && (question.options.length > 4 || question.options.some((o) => o.length > 48 || o.includes('`')));
+  const listOptions = question.type === 'mcq' && (question.options.length > 4 || question.options.some((o) => o.length > 48 || /[`$\n]/.test(o)));
   const rich = !!(card.mcq || card.code || card.title);
 
   return (
-    <div className={`question ${compact ? 'compact' : ''}`}>
-      <div className={`q-card ${rich ? 'rich-q' : ''}`}>
-        <div className="q-type">
+    <div className="flex animate-fade flex-col gap-6">
+      <div className="animate-card-in rounded-lg border-[3px] border-primary bg-card px-8 pt-6 pb-8 shadow-[0_4px_0_var(--accent-soft-strong)] max-[560px]:px-5">
+        <div className="mb-2 flex flex-wrap items-center gap-3 font-display text-sm font-semibold text-brand-ink">
           {question.type === 'mcq' ? '🎯 Choose the answer' : '⌨️ Type the answer'}
-          {card.title && <span className="q-title">{card.title}</span>}
+          {card.title && (
+            <Badge variant="brand" className="text-sm">
+              {card.title}
+            </Badge>
+          )}
         </div>
-        {rich ? <RichText className="q-front" text={card.front} /> : <div className="q-front">{card.front}</div>}
+        <Markdown
+          className={cn(
+            'font-display font-semibold',
+            rich ? (compact ? 'text-md leading-snug' : 'text-lg leading-snug') : compact ? 'text-lg leading-tight' : 'text-[30px] leading-tight',
+          )}
+          text={card.front}
+        />
         {card.code && <CodeBlock code={card.code} lang={card.codeLang} />}
         {card.hint && !answered && (
-          <button className={`card-hint ${cardHint ? 'open' : ''}`} onClick={() => setCardHint(true)} disabled={cardHint}>
-            💡 {cardHint ? <Inline text={card.hint} /> : 'Show hint'}
+          <button
+            className={cn(
+              'mt-4 inline-flex items-baseline gap-2 rounded-full bg-warning-soft px-3 py-1 text-left text-sm font-semibold text-warning-ink',
+              cardHint && 'cursor-default rounded-md font-medium',
+            )}
+            onClick={() => setCardHint(true)}
+            disabled={cardHint}
+          >
+            💡 {cardHint ? <Markdown inline text={card.hint} /> : 'Show hint'}
           </button>
         )}
       </div>
       {question.type === 'mcq' ? (
-        <div className={`options ${listOptions ? 'list' : ''}`}>
+        <div className="grid grid-cols-1 gap-3">
           {question.options.map((o, i) => {
-            let cls = 'option';
-            if (removed.includes(o)) cls += ' removed';
-            if (answered && o === card.back) cls += ' right';
-            else if (answered && o === chosen) cls += ' wrong';
+            const isRemoved = removed.includes(o);
+            const right = answered && o === card.back;
+            const wrong = answered && !right && o === chosen;
             return (
-              <button key={o + i} className={cls} disabled={answered || locked || removed.includes(o)} onClick={() => pick(o)}>
-                <span className="opt-key">{i === 9 ? 0 : i + 1}</span>
-                <span className="opt-text">
-                  <Inline text={o} />
-                </span>
+              <button
+                key={o + i}
+                data-quiet
+                style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
+                className={cn(
+                  'relative flex min-h-[60px] animate-[rise-in_0.35s_var(--bounce)_backwards] items-center justify-center rounded-full border-2 border-input bg-card px-12 py-3 text-center text-md font-semibold text-foreground shadow-ledge transition-[transform,border-color,background-color,opacity] duration-150 ease-bounce hover:not-disabled:-translate-y-0.5 hover:not-disabled:border-primary focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:not-disabled:translate-y-0.5 active:not-disabled:shadow-none disabled:cursor-default',
+                  listOptions && 'min-h-[52px] justify-start rounded-md pr-4 pl-14 text-left font-sans text-base font-medium',
+                  isRemoved && 'opacity-20',
+                  right && 'md-tinted animate-pop border-success bg-success-soft text-success-ink',
+                  wrong && 'md-tinted animate-shake border-transparent bg-destructive-soft text-destructive',
+                )}
+                disabled={answered || locked || isRemoved}
+                onClick={() => pick(o)}
+              >
+                <span className="absolute left-4 grid size-[26px] place-items-center rounded-full bg-muted font-display text-sm font-semibold text-muted-foreground">{i === 9 ? 0 : i + 1}</span>
+                <Markdown inline text={o} />
               </button>
             );
           })}
         </div>
       ) : (
-        <div className="typed">
-          {hint && <div className="hint-text">💡 {hint}</div>}
-          <input
+        <div className="flex flex-col gap-3">
+          {hint && <div className="font-mono text-lg tracking-[0.12em] text-warning-ink">💡 {hint}</div>}
+          <Input
             ref={inputRef}
-            className={`input typed-input ${answered ? 'answered' : ''}`}
+            className="h-15 rounded-full px-6 text-lg"
             placeholder="Your answer…"
             value={typed}
             disabled={answered || locked}
@@ -192,27 +227,31 @@ export function QuestionView({
             }}
           />
           {!answered && (
-            <div className="typed-actions">
-              <button
-                className="link"
+            <div className="flex items-center justify-between">
+              <Button
+                variant="link"
                 onClick={() => {
                   setChosen('');
                   onAnswer({ correct: false, ms: performance.now() - started.current, usedHint, given: '', type: 'typed' });
                 }}
               >
                 I don’t know
-              </button>
-              <button className="btn primary" disabled={!typed.trim()} onClick={submitTyped}>
+              </Button>
+              <Button variant="default" disabled={!typed.trim()} onClick={submitTyped}>
                 Check
-              </button>
+              </Button>
             </div>
           )}
         </div>
       )}
       {allowHints && !answered && !usedHint && (
-        <button className="btn small ghost hint-btn" disabled={s.profile.hints <= 0} onClick={() => void useHint()} title={s.profile.hints <= 0 ? 'Out of hints. Buy more in the shop.' : undefined}>
-          💡 {question.type === 'mcq' ? '50/50' : 'Reveal letters'} ({s.profile.hints})
-        </button>
+        <Tip label={s.profile.hints <= 0 ? 'Out of hints. Buy more in the shop.' : undefined}>
+          <span className="self-start">
+            <Button size="sm" variant="ghost" disabled={s.profile.hints <= 0} onClick={() => void useHint()}>
+              💡 {question.type === 'mcq' ? '50/50' : 'Reveal letters'} ({s.profile.hints})
+            </Button>
+          </span>
+        </Tip>
       )}
     </div>
   );
@@ -279,9 +318,9 @@ export function useSession(mode: StudyMode, scope: Scope, scheduled: boolean) {
 
 export function Hearts({ n, max }: { n: number; max: number }) {
   return (
-    <span className="hearts" aria-label={`${n} of ${max} hearts`}>
+    <span className="inline-flex gap-[3px] text-[20px]" aria-label={`${n} of ${max} hearts`}>
       {Array.from({ length: max }, (_, i) => (
-        <span key={i} className={i < n ? 'heart' : 'heart lost'}>
+        <span key={i} className={cn(i >= n && 'opacity-25 grayscale')}>
           ❤️
         </span>
       ))}
@@ -289,25 +328,42 @@ export function Hearts({ n, max }: { n: number; max: number }) {
   );
 }
 
+const comboPill = 'inline-flex h-7 items-center gap-1 rounded-full px-3 font-display text-sm font-semibold';
+
 export function ComboMeter({ combo }: { combo: number }) {
-  if (combo < 2) return <span className="combo-meter idle">🔥 Combo</span>;
-  const hot = combo >= 10 ? 'blazing' : combo >= 5 ? 'hot' : '';
+  if (combo < 2) return <span className={cn(comboPill, 'bg-muted text-muted-foreground opacity-60')}>🔥 Combo</span>;
   return (
-    <span key={combo} className={`combo-meter pop ${hot}`}>
+    <span key={combo} className={cn(comboPill, 'animate-pop bg-warning-soft text-warning-ink')}>
       🔥 {combo}× combo
     </span>
   );
 }
 
-export function PlayHeader({ onQuit, children }: { onQuit: () => void; children: React.ReactNode }) {
+/** The column every study mode plays in. */
+export function PlayShell({ wide, center, children }: { wide?: boolean; center?: boolean; children: React.ReactNode }) {
   return (
-    <div className="play-header">
-      <button className="icon-btn quit" onClick={onQuit} title="Quit (progress is saved)">
-        <Icon name="x" />
-      </button>
+    <div className={cn('route-in mx-auto min-h-screen px-6 pt-4 pb-[180px] max-[560px]:px-4', wide ? 'max-w-[960px]' : 'max-w-[720px]', center && 'flex items-center justify-center')}>
       {children}
     </div>
   );
+}
+
+export function PlayHeader({ onQuit, children }: { onQuit: () => void; children: React.ReactNode }) {
+  return (
+    <div className="mb-2 flex h-10 items-center gap-4">
+      <Tip label="Quit (progress is saved)">
+        <Button variant="plain" size="icon" className="-ml-2" aria-label="Quit" onClick={onQuit}>
+          <XIcon />
+        </Button>
+      </Tip>
+      {children}
+    </div>
+  );
+}
+
+/** The row under the play header: combo, chips and session XP. */
+export function PlaySub({ children }: { children: React.ReactNode }) {
+  return <div className="mb-2 flex min-h-7 flex-wrap items-center gap-4 text-sm text-muted-foreground">{children}</div>;
 }
 
 // ---------- feedback ----------
@@ -345,34 +401,43 @@ export function Feedback({
     };
   }, [onContinue]);
 
+  const good = outcome.correct;
   return (
-    <div className={`feedback ${outcome.correct ? 'good' : 'bad'}`}>
-      <div className="feedback-head">
-        <span className="feedback-title">{outcome.correct ? pickPraise() : outcome.given ? 'Not quite' : 'Here’s the answer'}</span>
-        {xp > 0 && <span className="feedback-xp">+{xp} XP</span>}
+    <div
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-30 max-h-[60vh] animate-slideup overflow-auto border-t-[3px] px-[max(24px,calc((100vw-720px)/2+24px))] py-6',
+        good ? 'border-success bg-success-soft' : 'border-destructive bg-destructive-soft',
+      )}
+    >
+      <div className="flex items-baseline justify-between">
+        <span className={cn('font-display text-xl font-bold', good ? 'text-success' : 'text-destructive')}>{good ? pickPraise() : outcome.given ? 'Not quite' : 'Here’s the answer'}</span>
+        {xp > 0 && <span className="rounded-full bg-card px-3 py-0.5 font-display text-md font-bold text-success">+{xp} XP</span>}
       </div>
-      {!outcome.correct && (
-        <div className="feedback-answer">
-          <span className="muted small">Correct answer</span>
-          <div>
-            <Inline text={card.back} />
-          </div>
+      {!good && (
+        <div className="my-3 text-md font-semibold">
+          <span className="block text-xs font-normal text-muted-foreground">Correct answer</span>
+          <Markdown text={card.back} />
         </div>
       )}
-      {outcome.type === 'typed' && outcome.correct && outcome.given.trim().toLowerCase() !== card.back.trim().toLowerCase() && (
-        <div className="feedback-answer">
-          <span className="muted small">Exact answer</span>
-          <div>{card.back}</div>
+      {outcome.type === 'typed' && good && outcome.given.trim().toLowerCase() !== card.back.trim().toLowerCase() && (
+        <div className="my-3 text-md font-semibold">
+          <span className="block text-xs font-normal text-muted-foreground">Exact answer</span>
+          <Markdown text={card.back} />
         </div>
       )}
-      {card.explanation && <RichText className="feedback-expl" text={card.explanation} />}
-      {appealNote && <p className="feedback-expl">⚖️ {appealNote}</p>}
-      <div className="feedback-actions">
-        <button className="btn ghost small" onClick={onExplain}>
+      {card.explanation && <Markdown className="my-2 text-muted-foreground" text={card.explanation} />}
+      {appealNote && (
+        <div className="my-2 flex gap-2 text-muted-foreground">
+          <span aria-hidden="true">⚖️</span>
+          <Markdown className="flex-1" text={appealNote} />
+        </div>
+      )}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={onExplain}>
           💬 Ask Claude
-        </button>
-        {onAppeal && !outcome.correct && outcome.type === 'typed' && outcome.given.trim() && (
-          <button className="btn ghost small" disabled={appealing} onClick={onAppeal}>
+        </Button>
+        {onAppeal && !good && outcome.type === 'typed' && outcome.given.trim() && (
+          <Button variant="ghost" size="sm" disabled={appealing} onClick={onAppeal}>
             {appealing ? (
               <>
                 <Spinner /> Claude is judging…
@@ -380,12 +445,12 @@ export function Feedback({
             ) : (
               '⚖️ I was right: ask Claude'
             )}
-          </button>
+          </Button>
         )}
-        <div className="grow" />
-        <button className={`btn big ${outcome.correct ? 'good' : 'primary'}`} onClick={onContinue}>
-          Continue <kbd>Enter</kbd>
-        </button>
+        <div className="flex-1" />
+        <Button size="lg" variant={good ? 'success' : 'default'} onClick={onContinue}>
+          Continue <Kbd>Enter</Kbd>
+        </Button>
       </div>
     </div>
   );
@@ -443,84 +508,112 @@ export function Results({
   const achievements = useMemo(() => (reward?.newAchievements ?? []).map((id) => ACHIEVEMENTS.find((a) => a.id === id)).filter(Boolean), [reward]);
 
   return (
-    <div className="results">
+    <ResultsColumn>
       <Mascot mood={reward && reward.totalXp > 0 ? 'wow' : 'happy'} size={130} />
       <h1>{title}</h1>
-      {subtitle && <p className="muted">{subtitle}</p>}
+      {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
       {reward && (
-        <div className="results-xp">
-          <span className="results-xp-num">
+        <div className="flex items-baseline gap-4 font-display font-bold">
+          <span className="text-[56px] text-primary">
             +<CountUp value={reward.totalXp} delay={450} duration={1100} sound /> XP
           </span>
-          {reward.coins > 0 && (
-            <span className="results-coins">🪙 +{reward.coins}</span>
-          )}
+          {reward.coins > 0 && <span className="inline-flex items-center gap-1.5 text-xl text-warning-ink">🪙 +{reward.coins}</span>}
         </div>
       )}
-      <div className="results-stats">
-        {stats.map((st) => (
-          <div key={st.label} className="stat-tile">
-            <div className="stat-value">{st.value}</div>
-            <div className="muted small">{st.label}</div>
+      <div className="flex flex-wrap justify-center gap-3 max-[560px]:w-full max-[560px]:flex-col">
+        {stats.map((st, i) => (
+          <div key={st.label} className="min-w-[130px] animate-pop-in rounded-lg border-2 border-border bg-card px-6 py-3 shadow-ledge" style={{ animationDelay: `${i * 80}ms` }}>
+            <div className="font-display text-xl font-bold tabular-nums">{st.value}</div>
+            <div className="text-sm text-muted-foreground">{st.label}</div>
           </div>
         ))}
       </div>
       {reward && reward.bonusReasons.length > 0 && (
-        <ul className="bonus-list">
+        <ul className="font-semibold text-brand-ink">
           {reward.bonusReasons.map((b) => (
             <li key={b}>✨ {b}</li>
           ))}
         </ul>
       )}
       {levelUp && (
-        <div className="banner levelup">
+        <Banner>
           ⭐ Level up! You reached <b>level {reward!.levelAfter}</b>
           {reward!.levelCoins > 0 && <> · 🪙 +{reward!.levelCoins}</>}
-        </div>
+        </Banner>
       )}
       {reward?.rank && (
-        <div className="banner levelup">
+        <Banner>
           {reward.rank.icon} New rank: <b>{reward.rank.title}</b>
-        </div>
+        </Banner>
       )}
       {reward?.unlocks.map((id) => {
         const item = SHOP.find((i) => i.id === id);
         return item ? (
-          <a key={id} className="banner unlock" href="#/shop">
+          <Banner key={id} tone="success" href="#/shop">
             {item.icon} Unlocked {item.kind === 'hat' ? 'a hat for Flicky' : `a new ${item.kind}`}: <b>{item.name}</b>
-          </a>
+          </Banner>
         ) : null;
       })}
       {streakUp && (
-        <div className="banner streak">
+        <Banner tone="warning">
           🔥 Streak extended to <b>{reward!.streakAfter} day{reward!.streakAfter === 1 ? '' : 's'}</b>
-        </div>
+        </Banner>
       )}
-      {reward?.goalReached && <div className="banner goal">🎯 Daily goal reached! Your chest is waiting on the home screen.</div>}
-      {reward?.newRecord && <div className="banner record">🏆 New personal record!</div>}
+      {reward?.goalReached && <Banner tone="success">🎯 Daily goal reached! Your chest is waiting on the home screen.</Banner>}
+      {reward?.newRecord && <Banner tone="warning">🏆 New personal record!</Banner>}
       {achievements.slice(0, achievements.length > 4 ? 3 : 4).map((a) => (
-        <div key={a!.id} className="banner achievement">
+        <Banner key={a!.id} tone="warning">
           {a!.icon} Achievement unlocked: <b>{a!.name}</b> · 🪙 +{a!.coins}
-        </div>
+        </Banner>
       ))}
       {achievements.length > 4 && (
-        <a className="banner achievement" href="#/achievements">
+        <Banner tone="warning" href="#/achievements">
           🏆 And {achievements.length - 3} more trophies
-        </a>
+        </Banner>
       )}
-      <div className="results-actions">
-        <button className="btn big" onClick={() => navigate(scopeHome(scope))}>
+      <ResultsActions>
+        <Button size="lg" onClick={() => navigate(scopeHome(scope))}>
           {scopeBackLabel(scope)}
-        </button>
+        </Button>
         {onAgain && (
-          <button className="btn primary big" onClick={onAgain}>
+          <Button variant="default" size="lg" onClick={onAgain}>
             {againLabel}
-          </button>
+          </Button>
         )}
-      </div>
-      <p className="muted small">
-        Today <span className="num">{s.todayXp} / {s.settings.dailyGoalXp}</span> XP
+      </ResultsActions>
+      <p className="text-sm text-muted-foreground">
+        Today{' '}
+        <span className="num">
+          {s.todayXp} / {s.settings.dailyGoalXp}
+        </span>{' '}
+        XP
       </p>
-    </div>
+    </ResultsColumn>
+  );
+}
+
+/** A centered column whose lines arrive one after another: results, intros, game over. */
+export function ResultsColumn({ children }: { children: React.ReactNode }) {
+  return <div className="stagger flex flex-col items-center gap-4 py-8 text-center">{children}</div>;
+}
+
+export function ResultsActions({ children }: { children: React.ReactNode }) {
+  return <div className="mt-2 flex flex-wrap justify-center gap-2">{children}</div>;
+}
+
+const BANNER_TONE = {
+  brand: 'border-brand-soft-strong bg-accent',
+  warning: 'border-[color-mix(in_srgb,var(--warn)_40%,var(--surface))] bg-warning-soft',
+  success: 'border-[color-mix(in_srgb,var(--good)_35%,var(--surface))] bg-success-soft',
+};
+
+function Banner({ tone = 'brand', href, children }: { tone?: keyof typeof BANNER_TONE; href?: string; children: React.ReactNode }) {
+  const cls = cn('block w-[min(520px,100%)] rounded-full border-2 px-6 py-3 text-center font-semibold text-foreground no-underline', BANNER_TONE[tone]);
+  return href ? (
+    <a className={cls} href={href}>
+      {children}
+    </a>
+  ) : (
+    <div className={cls}>{children}</div>
   );
 }

@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Reward } from '../../shared/types.ts';
 import { api, type StudyData } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
-import { EmptyState, Spinner } from '../components/ui.tsx';
+import { EmptyState, Spinner } from '../components/shared.tsx';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
-import { ComboMeter, PlayHeader, QuestionView, Results, buildQuestion, useSession, type AnswerOutcome } from './common.tsx';
+import { ComboMeter, PlayHeader, PlayShell, PlaySub, QuestionView, Results, ResultsActions, ResultsColumn, buildQuestion, useSession, type AnswerOutcome } from './common.tsx';
 import { type Scope, scopeBackLabel, scopeHome } from '../scope.ts';
 
 const DURATION = 60_000;
@@ -93,28 +95,27 @@ function TimeAttackRun({ scope, onRestart }: { scope: Scope; onRestart: () => vo
 
   if (!data) {
     return (
-      <div className="play center">
-        <Spinner />
-      </div>
+      <PlayShell center>
+        <Spinner className="size-6" />
+      </PlayShell>
     );
   }
 
   if (data.cards.length === 0) {
     return (
-      <div className="play center">
-        <EmptyState mood="sleepy" title="No cards to play yet">
-          <p className="muted">Add some cards and study them first, then come back.</p>
-          <button className="btn primary" onClick={() => navigate(scopeHome(scope))}>
+      <PlayShell center>
+        <EmptyState mood="sleepy" title="No cards to play yet" description="Add some cards and study them first, then come back.">
+          <Button variant="default" onClick={() => navigate(scopeHome(scope))}>
             {scopeBackLabel(scope)}
-          </button>
+          </Button>
         </EmptyState>
-      </div>
+      </PlayShell>
     );
   }
 
   if (over) {
     return (
-      <div className="play">
+      <PlayShell center={!reward}>
         {reward ? (
           <Results
             reward={reward}
@@ -129,32 +130,29 @@ function TimeAttackRun({ scope, onRestart }: { scope: Scope; onRestart: () => vo
             onAgain={onRestart}
           />
         ) : (
-          <div className="center">
-            <Spinner />
-          </div>
+          <Spinner className="size-6" />
         )}
-      </div>
+      </PlayShell>
     );
   }
 
   if (!started) {
     return (
-      <div className="play">
-        <div className="results">
-          <div className="boss-intro">⏱️</div>
+      <PlayShell>
+        <ResultsColumn>
+          <div className="animate-bob text-[110px] leading-none">⏱️</div>
           <h1>Time Attack</h1>
-          <p className="muted">
-            60 seconds on the clock. Correct answers add 1s, wrong ones cost 3s. Keys 1–4 answer fast.
-          </p>
+          <p className="text-muted-foreground">60 seconds on the clock. Correct answers add 1s, wrong ones cost 3s. Keys 1–4 answer fast.</p>
           <p>
             Personal best: <b>{s.profile.stats.timeAttackBest}</b>
           </p>
-          <div className="results-actions">
-            <button className="btn big" onClick={() => navigate(scopeHome(scope))}>
+          <ResultsActions>
+            <Button size="lg" onClick={() => navigate(scopeHome(scope))}>
               Back
-            </button>
-            <button
-              className="btn primary big"
+            </Button>
+            <Button
+              variant="default"
+              size="lg"
               onClick={() => {
                 const t = performance.now();
                 setNow(t);
@@ -163,29 +161,30 @@ function TimeAttackRun({ scope, onRestart }: { scope: Scope; onRestart: () => vo
               }}
             >
               Start!
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </ResultsActions>
+        </ResultsColumn>
+      </PlayShell>
     );
   }
 
   const pct = remaining / DURATION;
+  const low = remaining < 10_000;
   return (
-    <div className="play">
+    <PlayShell>
       <PlayHeader onQuit={() => setOver(true)}>
-        <div className="timebar grow">
-          <div className={`timebar-fill ${remaining < 10_000 ? 'low' : ''}`} style={{ width: `${Math.min(100, pct * 100)}%` }} />
+        <div className="h-3.5 flex-1 overflow-hidden rounded-full bg-track">
+          <div className={cn('h-full rounded-full transition-[width] duration-100 ease-linear', low ? 'bg-destructive' : 'bg-success')} style={{ width: `${Math.min(100, pct * 100)}%` }} />
         </div>
-        <span className={`timer ${remaining < 10_000 ? 'low' : ''}`}>{(remaining / 1000).toFixed(1)}s</span>
+        <span className={cn('min-w-[70px] text-right font-display text-xl font-bold tabular-nums', low && 'text-destructive')}>{(remaining / 1000).toFixed(1)}s</span>
       </PlayHeader>
-      <div className="play-sub">
-        <span className="score">Score {score}</span>
+      <PlaySub>
+        <span className="font-display text-xl font-bold text-foreground">Score {score}</span>
         <ComboMeter combo={session.combo} />
-      </div>
-      <div className="stage" ref={stageRef}>
+      </PlaySub>
+      <div className="mt-6" ref={stageRef}>
         {card && question && <QuestionView key={pos} card={card} question={question} onAnswer={onAnswer} locked={locked} allowHints={false} compact />}
       </div>
-    </div>
+    </PlayShell>
   );
 }

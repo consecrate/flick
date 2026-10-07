@@ -1,24 +1,28 @@
 import { ACHIEVEMENTS, TIER_COINS, TROPHY_FAMILIES, type TrophyFamily } from '../../shared/game.ts';
 import { useAppState } from '../app-context.tsx';
-import { ProgressBar } from '../components/ui.tsx';
+import { Page, ProgressBar } from '../components/shared.tsx';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 export function Achievements() {
   const s = useAppState();
   const unlocked = s.profile.achievements;
   const count = ACHIEVEMENTS.filter((a) => unlocked[a.id]).length;
   return (
-    <div className="page">
-      <h1>Trophies 🏆</h1>
-      <p className="muted">
-        {count} of {ACHIEVEMENTS.length} unlocked. Every trophy has tiers, and each tier pays more coins than the last.
-      </p>
-      <ProgressBar value={count} max={ACHIEVEMENTS.length} height={14} />
-      <div className="trophy-grid">
+    <Page>
+      <div className="flex flex-col gap-3">
+        <h1>Trophies 🏆</h1>
+        <p className="text-muted-foreground">
+          {count} of {ACHIEVEMENTS.length} unlocked. Every trophy has tiers, and each tier pays more coins than the last.
+        </p>
+        <ProgressBar value={count} max={ACHIEVEMENTS.length} className="h-3.5" />
+      </div>
+      <div className="stagger grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {TROPHY_FAMILIES.map((f) => (
           <Family key={f.id} family={f} />
         ))}
       </div>
-    </div>
+    </Page>
   );
 }
 
@@ -33,34 +37,47 @@ function Family({ family: f }: { family: TrophyFamily }) {
   const show = (v: number) => (f.lowerIsBetter ? `${(v / 1000).toFixed(1)}s` : v.toLocaleString());
 
   return (
-    <div className={`trophy ${best ? 'unlocked' : 'locked'} ${next ? '' : 'complete'}`}>
-      <div className="trophy-icon">{best ? best.icon : next!.icon}</div>
-      <div className="trophy-name">{best ? best.name : f.name}</div>
-      <div className="tier-pips" aria-label={`${doneCount} of ${f.tiers.length} tiers`}>
+    <Card
+      className={cn(
+        'items-center gap-1 px-4 pt-6 pb-4 text-center text-sm',
+        best ? 'border-[color-mix(in_srgb,var(--warn)_45%,var(--surface))] bg-warning-soft' : 'text-muted-foreground',
+        !next && 'border-warning',
+      )}
+    >
+      <div className={cn('mb-2 grid size-16 place-items-center rounded-full bg-muted text-[34px]', !best && 'opacity-40 grayscale')}>{best ? best.icon : next!.icon}</div>
+      <div className={cn('font-display text-md font-semibold', best ? 'text-foreground' : 'text-muted-foreground')}>{best ? best.name : f.name}</div>
+      <div className="mt-0.5 mb-1 flex gap-1" aria-label={`${doneCount} of ${f.tiers.length} tiers`}>
         {f.tiers.map((t) => (
-          <span key={t.id} className={`tier-pip ${unlocked[t.id] ? 'on' : ''}`} title={`${t.icon} ${t.name}: ${f.desc(t.target)}${unlocked[t.id] ? ` · ${new Date(unlocked[t.id]).toLocaleDateString()}` : ''}`} />
+          <span
+            key={t.id}
+            className={cn(
+              'size-2.5 rounded-full border-2',
+              unlocked[t.id] ? 'border-[color-mix(in_srgb,var(--warn)_70%,var(--ink))] bg-warning' : 'border-input bg-track',
+            )}
+            title={`${t.icon} ${t.name}: ${f.desc(t.target)}${unlocked[t.id] ? ` · ${new Date(unlocked[t.id]).toLocaleDateString()}` : ''}`}
+          />
         ))}
       </div>
       {next ? (
         <>
-          <div className="muted small">
+          <div className="text-muted-foreground">
             Next: {next.icon} <b>{next.name}</b>
           </div>
-          <div className="muted small">{f.desc(next.target)}</div>
+          <div className="text-muted-foreground">{f.desc(next.target)}</div>
           {value !== null && !f.lowerIsBetter && (
-            <div className="trophy-progress">
-              <ProgressBar value={value} max={next.target} height={6} />
-              <span className="muted small num">
+            <div className="flex w-full items-center gap-2">
+              <ProgressBar value={value} max={next.target} className="h-1.5 flex-1" />
+              <span className="num text-muted-foreground">
                 {show(Math.min(value, next.target))} / {show(next.target)}
               </span>
             </div>
           )}
-          {value !== null && f.lowerIsBetter && <div className="muted small num">Best: {show(value)}</div>}
-          <div className="muted small">🪙 {TIER_COINS[Math.min(nextIndex, TIER_COINS.length - 1)]}</div>
+          {value !== null && f.lowerIsBetter && <div className="num text-muted-foreground">Best: {show(value)}</div>}
+          <div className="text-muted-foreground">🪙 {TIER_COINS[Math.min(nextIndex, TIER_COINS.length - 1)]}</div>
         </>
       ) : (
-        <div className="muted small">All {f.tiers.length} tiers complete ✨</div>
+        <div className="text-muted-foreground">All {f.tiers.length} tiers complete ✨</div>
       )}
-    </div>
+    </Card>
   );
 }

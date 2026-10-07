@@ -4,10 +4,12 @@ import type { Reward } from '../../shared/types.ts';
 import { api, type CardView, type StudyData } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
-import { EmptyState, Spinner } from '../components/ui.tsx';
+import { EmptyState, Spinner } from '../components/shared.tsx';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { confetti, floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
-import { ComboMeter, Feedback, Hearts, PlayHeader, QuestionView, Results, buildQuestion, useSession, type AnswerOutcome } from './common.tsx';
+import { ComboMeter, Feedback, Hearts, PlayHeader, PlayShell, QuestionView, Results, ResultsActions, ResultsColumn, buildQuestion, useSession, type AnswerOutcome } from './common.tsx';
 import { type Scope, scopeBackLabel, scopeHome } from '../scope.ts';
 
 const HIT = 100;
@@ -99,28 +101,27 @@ function BossRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) 
 
   if (!data) {
     return (
-      <div className="play center">
-        <Spinner />
-      </div>
+      <PlayShell center>
+        <Spinner className="size-6" />
+      </PlayShell>
     );
   }
 
   if (data.cards.length === 0) {
     return (
-      <div className="play center">
-        <EmptyState mood="sleepy" title="No cards to fight yet">
-          <p className="muted">Add some cards and study them first, then come back.</p>
-          <button className="btn primary" onClick={() => navigate(scopeHome(scope))}>
+      <PlayShell center>
+        <EmptyState mood="sleepy" title="No cards to fight yet" description="Add some cards and study them first, then come back.">
+          <Button variant="default" onClick={() => navigate(scopeHome(scope))}>
             {scopeBackLabel(scope)}
-          </button>
+          </Button>
         </EmptyState>
-      </div>
+      </PlayShell>
     );
   }
 
   if (result) {
     return (
-      <div className="play">
+      <PlayShell center={!reward}>
         {reward ? (
           <Results
             reward={reward}
@@ -136,64 +137,70 @@ function BossRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) 
             againLabel={result === 'won' ? 'Fight again' : 'Rematch'}
           />
         ) : (
-          <div className="center">
-            <Spinner />
-          </div>
+          <Spinner className="size-6" />
         )}
-      </div>
+      </PlayShell>
     );
   }
 
   if (intro) {
     return (
-      <div className="play">
-        <div className="results">
-          <div className="boss-intro">{boss.emoji}</div>
+      <PlayShell>
+        <ResultsColumn>
+          <div className="animate-[bob_2s_ease-in-out_infinite] text-[110px] leading-none">{boss.emoji}</div>
           <h1>{boss.name}</h1>
-          <p className="muted">
-            A boss built from your {queue.length} hardest cards. Each correct answer hits for {HIT}+ damage (combos hit harder, with a chance of
-            critical hits). You have {BOSS_HEARTS} hearts.
+          <p className="text-muted-foreground">
+            A boss built from your {queue.length} hardest cards. Each correct answer hits for {HIT}+ damage (combos hit harder, with a chance of critical hits). You have{' '}
+            {BOSS_HEARTS} hearts.
           </p>
-          <div className="results-actions">
-            <button className="btn big" onClick={() => navigate(scopeHome(scope))}>
+          <ResultsActions>
+            <Button size="lg" onClick={() => navigate(scopeHome(scope))}>
               Flee
-            </button>
-            <button className="btn primary big" onClick={() => setIntro(false)}>
+            </Button>
+            <Button variant="default" size="lg" onClick={() => setIntro(false)}>
               ⚔️ Fight!
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </ResultsActions>
+        </ResultsColumn>
+      </PlayShell>
     );
   }
 
+  const defeated = hp <= 0;
   return (
-    <div className="play">
+    <PlayShell>
       <PlayHeader onQuit={() => navigate(scopeHome(scope))}>
-        <div className="grow" />
+        <div className="flex-1" />
         <div ref={playerRef}>
           <Hearts n={hearts} max={BOSS_HEARTS} />
         </div>
       </PlayHeader>
-      <div className="boss-arena">
-        <div className={`boss ${hp <= 0 ? 'defeated' : ''}`} ref={bossRef}>
-          <div className="boss-emoji">{boss.emoji}</div>
-          <div className="boss-name">{boss.name}</div>
-          <div className="boss-hp">
-            <div className="boss-hp-fill" style={{ width: `${(hp / maxHp) * 100}%` }} />
-            <span className="boss-hp-text">
+      <div className="flex flex-col items-center gap-2 rounded-lg border-2 border-[color-mix(in_srgb,var(--bad)_25%,var(--surface))] bg-destructive-soft px-4 py-6">
+        <div className="relative flex w-full max-w-[420px] flex-col items-center gap-1" ref={bossRef}>
+          <div
+            className={cn(
+              'text-[84px] leading-[1.1]',
+              defeated ? 'scale-80 rotate-90 grayscale transition-transform duration-600 ease-bounce' : 'animate-[bob_2.6s_ease-in-out_infinite]',
+            )}
+          >
+            {boss.emoji}
+          </div>
+          <div className="font-display text-lg font-bold">{boss.name}</div>
+          <div className="relative h-[22px] w-full overflow-hidden rounded-full border-2 border-[color-mix(in_srgb,var(--bad)_35%,var(--surface))] bg-card">
+            <div className="h-full bg-destructive transition-[width] duration-400 ease-smooth" style={{ width: `${(hp / maxHp) * 100}%` }} />
+            <span className="absolute inset-0 grid place-items-center font-display text-xs font-bold">
               {hp} / {maxHp}
             </span>
           </div>
-          {lastHit?.crit && <div className="crit">CRITICAL!</div>}
+          {lastHit?.crit && <div className="absolute top-0 right-0 animate-pop font-display text-lg font-bold text-warning">CRITICAL!</div>}
         </div>
         <ComboMeter combo={session.combo} />
       </div>
-      <div className="stage">
+      <div className="mt-6">
         {card && question && <QuestionView key={`${card.id}:${pos}`} card={card} question={question} onAnswer={onAnswer} locked={outcome !== null} />}
       </div>
       {outcome && <Feedback card={card} outcome={outcome} xp={0} onContinue={next} onExplain={() => setExplain(true)} />}
       {explain && <ExplainModal card={card} onClose={() => setExplain(false)} />}
-    </div>
+    </PlayShell>
   );
 }
