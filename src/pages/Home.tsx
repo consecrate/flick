@@ -172,7 +172,7 @@ export function Home() {
                 <div>
                   <div className="deck-title">{d.title}</div>
                   <div className="deck-meta">
-                    {d.cardCount} card{d.cardCount === 1 ? '' : 's'}
+                    {d.cardCount === 0 ? 'No cards yet' : `${d.cardCount} card${d.cardCount === 1 ? '' : 's'}`}
                   </div>
                 </div>
                 <div className="deck-progress" title="Mastered">

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { buildMcqPrompt, parseMcqs } from '../../shared/mcq.ts';
 import { api, type GenerateResult, type SourceInput } from '../api.ts';
-import { useApp } from '../app-context.tsx';
+import { navigate, useApp } from '../app-context.tsx';
 import { sfx } from '../sound.ts';
 import { ClaudeLoader, Modal } from './ui.tsx';
 
@@ -63,6 +63,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
   const [mcqText, setMcqText] = useState('');
   const [mcqTopic, setMcqTopic] = useState('');
   const [copied, setCopied] = useState(false);
+  const [blank, setBlank] = useState(false);
   const prompt = useMemo(() => buildMcqPrompt({ topic: mcqTopic, count, level }), [mcqTopic, count, level]);
   const parsed = useMemo(() => (tab === 'mcq' && mcqText.trim() ? parseMcqs(mcqText) : null), [tab, mcqText]);
 
@@ -123,6 +124,46 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
       setBusy(false);
     }
   };
+
+  const createEmpty = async () => {
+    setBusy(true);
+    try {
+      const d = await api.createDeck({ title });
+      sfx.unlock();
+      await refresh();
+      announceAchievements(d.newAchievements);
+      onClose();
+      navigate(`/deck/${d.id}`);
+    } catch (e) {
+      showError(e);
+      setBusy(false);
+    }
+  };
+
+  if (blank) {
+    return (
+      <Modal onClose={busy ? () => {} : onClose}>
+        <h2>New empty deck</h2>
+        <p className="muted">Name it now and add cards whenever you are ready.</p>
+        <input
+          className="input"
+          autoFocus
+          placeholder="Deck title, e.g. Spanish verbs"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && title.trim() && !busy && void createEmpty()}
+        />
+        <div className="modal-actions">
+          <button className="btn ghost" disabled={busy} onClick={() => setBlank(false)}>
+            Back
+          </button>
+          <button className="btn primary" disabled={busy || !title.trim()} onClick={() => void createEmpty()}>
+            Create deck
+          </button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal onClose={busy ? () => {} : onClose} wide>
@@ -307,6 +348,14 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
           )}
 
           <div className="modal-actions">
+            {!deckId && (
+              <>
+                <button className="btn ghost" onClick={() => setBlank(true)}>
+                  Start with an empty deck
+                </button>
+                <div className="grow" />
+              </>
+            )}
             <button className="btn ghost" onClick={onClose}>
               Cancel
             </button>

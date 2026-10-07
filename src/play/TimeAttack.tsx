@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Reward } from '../../shared/types.ts';
 import { api, type StudyData } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
-import { Spinner } from '../components/ui.tsx';
+import { EmptyState, Spinner } from '../components/ui.tsx';
 import { floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { ComboMeter, PlayHeader, QuestionView, Results, buildQuestion, useSession, type AnswerOutcome } from './common.tsx';
@@ -94,6 +94,19 @@ function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart
     return (
       <div className="play center">
         <Spinner />
+      </div>
+    );
+  }
+
+  if (data.cards.length === 0) {
+    return (
+      <div className="play center">
+        <EmptyState mood="sleepy" title="No cards to play yet">
+          <p className="muted">Add some cards and study them first, then come back.</p>
+          <button className="btn primary" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+            {deckId ? 'Back to deck' : 'Home'}
+          </button>
+        </EmptyState>
       </div>
     );
   }
