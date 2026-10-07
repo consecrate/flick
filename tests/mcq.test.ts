@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_OPTIONS, buildMcqPrompt, parseMcqs } from '../shared/mcq.ts';
+import { MAX_OPTIONS, buildImportPrompt, parseMcqs } from '../shared/mcq.ts';
+import { itemToCard } from '../server/ai.ts';
 
 const SAMPLE = `## Calling a subclass method
 In Java, what happens when you compile and run this program?
@@ -76,14 +77,41 @@ describe('parseMcqs', () => {
     expect(errors.map((e) => e.title)).toEqual(['No answer', 'Two answers', 'Too many', 'Duplicate']);
   });
 
-  it('parses the example inside its own prompt', () => {
-    const prompt = buildMcqPrompt({ topic: 'Java', count: 5 });
-    const example = prompt.slice(prompt.indexOf('## Calling a subclass method'));
-    const { questions, errors } = parseMcqs(example);
+  it('parses both examples inside its own prompt', () => {
+    const prompt = buildImportPrompt({ topic: 'Java' });
+    const examples = prompt.slice(prompt.indexOf('## Where the Krebs cycle runs'));
+    const { questions, errors } = parseMcqs(examples.replace(/\nExample of a multiple-choice question:\n/, '\n'));
     expect(errors).toEqual([]);
-    expect(questions).toHaveLength(1);
-    expect(questions[0].answer).toBe('Compilation error');
-    expect(questions[0].code).toContain('a.fetch();');
-    expect(prompt).toContain('Write 5 multiple-choice questions on this subject: Java.');
+    expect(questions).toHaveLength(2);
+    expect(questions[0]).toMatchObject({ flashcard: true, answer: 'The mitochondrial matrix', distractors: ['The cytoplasm', 'The inner mitochondrial membrane', 'The nucleus'] });
+    expect(questions[1].flashcard).toBeUndefined();
+    expect(questions[1].answer).toBe('Compilation error');
+    expect(questions[1].code).toContain('a.fetch();');
+    expect(prompt).toContain('Write a mix of flashcards and multiple-choice questions about this subject: Java.');
+    expect(prompt).not.toMatch(/Write \d+/);
+  });
+
+  it('reads a flashcard as an Answer line, with or without wrong answers', () => {
+    const { questions, errors } = parseMcqs('## TCP handshake\nIn TCP, which segment does a client send first to open a connection?\n\n**Answer:** SYN\nExplanation: SYN asks the server to synchronize sequence numbers.\n\n## Bare\nIn Python, which keyword defines a generator function\'s yield point?\nAnswer: yield');
+    expect(errors).toEqual([]);
+    expect(questions[0]).toMatchObject({ flashcard: true, answer: 'SYN', distractors: [], explanation: 'SYN asks the server to synchronize sequence numbers.' });
+    expect(questions[1]).toMatchObject({ flashcard: true, answer: 'yield' });
+  });
+
+  it('keeps a lettered answer as a multiple-choice question', () => {
+    const { questions } = parseMcqs('## Q\nWhich?\nA) one\nB) two\nAnswer: A');
+    expect(questions[0].flashcard).toBeUndefined();
+    expect(questions[0].answer).toBe('one');
+  });
+});
+
+describe('itemToCard', () => {
+  const base = { title: 'T', question: 'Q?', code: '', language: '', answer: 'A', distractors: ['b', 'c', 'd', 'e'], hint: 'h', explanation: 'e' };
+  it('maps a flashcard to a short-answer card with 3 distractors and no MCQ fields', () => {
+    expect(itemToCard({ ...base, type: 'flashcard' })).toEqual({ front: 'Q?', back: 'A', distractors: ['b', 'c', 'd'], explanation: 'e', mcq: false, title: undefined, code: undefined, codeLang: undefined, hint: undefined });
+  });
+  it('maps a multiple-choice question with code', () => {
+    const c = itemToCard({ ...base, type: 'mcq', code: 'int x;', language: 'C++' });
+    expect(c).toMatchObject({ mcq: true, title: 'T', code: 'int x;', codeLang: 'cpp', hint: 'h', distractors: ['b', 'c', 'd', 'e'] });
   });
 });

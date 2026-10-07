@@ -307,7 +307,7 @@ export function DeckPage({ id }: { id: string }) {
             <div key={m.id} className="card-row">
               <div className="card-row-main">
                 <div className="card-front">
-                  <span className="chip">{{ text: '📝 Notes', file: '📄 File', url: '🔗 Link', topic: '💭 Topic', import: '📥 List', mcq: '🎯 Questions' }[m.kind]}</span>
+                  <span className="chip">{{ text: '📝 Notes', file: '📄 File', url: '🔗 Link', topic: '💭 Topic', import: '📥 List', mcq: '📋 Pasted' }[m.kind]}</span>
                   {m.title}
                 </div>
                 <div className="card-back muted">{m.preview}</div>
