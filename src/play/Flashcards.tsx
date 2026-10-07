@@ -8,6 +8,7 @@ import { EmptyState, ProgressBar, Spinner } from '../components/ui.tsx';
 import { floatText } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { ComboMeter, PlayHeader, Results, useSession } from './common.tsx';
+import { type Scope, scopeHome } from '../scope.ts';
 
 const RATINGS = [
   { r: 1, label: 'Again', key: '1', cls: 'again' },
@@ -16,14 +17,14 @@ const RATINGS = [
   { r: 4, label: 'Easy', key: '4', cls: 'easy' },
 ] as const;
 
-export function Flashcards({ deckId }: { deckId: string | null }) {
+export function Flashcards({ scope }: { scope: Scope }) {
   const [run, setRun] = useState(0);
-  return <FlashRun key={run} deckId={deckId} onRestart={() => setRun((r) => r + 1)} />;
+  return <FlashRun key={run} scope={scope} onRestart={() => setRun((r) => r + 1)} />;
 }
 
-function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () => void }) {
+function FlashRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) {
   const { showError } = useApp();
-  const session = useSession('flashcards', deckId, true);
+  const session = useSession('flashcards', scope, true);
   const [queue, setQueue] = useState<CardView[] | null>(null);
   const [pos, setPos] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -39,7 +40,7 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
   const load = useCallback(
     async (practiceAhead = false) => {
       try {
-        const d = await api.study('flashcards', deckId, { ahead: practiceAhead });
+        const d = await api.study('flashcards', scope, { ahead: practiceAhead });
         setQueue(d.cards);
         setAhead(d.ahead);
         shownAt.current = performance.now();
@@ -47,7 +48,7 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
         showError(e);
       }
     },
-    [deckId, showError],
+    [scope, showError],
   );
 
   useEffect(() => {
@@ -119,7 +120,7 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
         <Results
           reward={reward}
           title="Deck flipped!"
-          deckId={deckId}
+          scope={scope}
           stats={[
             { label: 'Cards rated', value: t.answers },
             { label: 'Remembered', value: t.answers ? `${Math.round((t.correct / t.answers) * 100)}%` : '–' },
@@ -137,7 +138,7 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
       <div className="play">
         <EmptyState mood="sleepy" title="Nothing due right now">
           <div className="row center-row">
-            <button className="btn" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+            <button className="btn" onClick={() => navigate(scopeHome(scope))}>
               Back
             </button>
             <button className="btn primary" onClick={() => void load(true)}>
@@ -151,7 +152,7 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
 
   return (
     <div className="play">
-      <PlayHeader onQuit={() => (session.tally.current.answers > 0 ? void finish() : navigate(deckId ? `/deck/${deckId}` : '/'))}>
+      <PlayHeader onQuit={() => (session.tally.current.answers > 0 ? void finish() : navigate(scopeHome(scope)))}>
         <ProgressBar value={pos} max={queue.length} height={14} className="grow" />
         <span className="muted small">
           {pos + 1}/{queue.length}

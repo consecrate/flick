@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { AppProvider, navigate, useApp, useRoute } from './app-context.tsx';
 import { TopBar } from './components/ui.tsx';
+import { folderScope } from './scope.ts';
 import { sfx } from './sound.ts';
 import { Achievements } from './pages/Achievements.tsx';
 import { DeckPage } from './pages/Deck.tsx';
+import { FolderPage } from './pages/Folder.tsx';
 import { Home } from './pages/Home.tsx';
 import { Settings } from './pages/Settings.tsx';
 import { Shop } from './pages/Shop.tsx';
@@ -53,17 +55,18 @@ function Routes() {
 
   if (parts[0] === 'play') {
     const mode = parts[1];
-    const deckId = parts[2] && parts[2] !== 'all' ? parts[2] : null;
-    const key = `${mode}:${deckId}`;
-    if (mode === 'quiz') return <Quiz key={key} deckId={deckId} />;
-    if (mode === 'flashcards') return <Flashcards key={key} deckId={deckId} />;
-    if (mode === 'match') return <Match key={key} deckId={deckId} />;
-    if (mode === 'timeattack') return <TimeAttack key={key} deckId={deckId} />;
-    if (mode === 'boss') return <Boss key={key} deckId={deckId} />;
+    const scope = parts[2] === 'folder' && parts[3] ? folderScope(parts[3]) : parts[2] && parts[2] !== 'all' ? parts[2] : null;
+    const key = `${mode}:${scope}`;
+    if (mode === 'quiz') return <Quiz key={key} scope={scope} />;
+    if (mode === 'flashcards') return <Flashcards key={key} scope={scope} />;
+    if (mode === 'match') return <Match key={key} scope={scope} />;
+    if (mode === 'timeattack') return <TimeAttack key={key} scope={scope} />;
+    if (mode === 'boss') return <Boss key={key} scope={scope} />;
   }
 
   let page;
   if (parts[0] === 'deck' && parts[1]) page = <DeckPage key={parts[1]} id={parts[1]} />;
+  else if (parts[0] === 'folder' && parts[1]) page = <FolderPage key={parts[1]} id={parts[1]} />;
   else if (parts[0] === 'stats') page = <Stats />;
   else if (parts[0] === 'achievements') page = <Achievements />;
   else if (parts[0] === 'shop') page = <Shop />;

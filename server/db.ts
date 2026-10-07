@@ -4,11 +4,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Card, Deck, Material, Profile, ReviewEntry, Settings } from '../shared/types.ts';
+import type { Card, Deck, Folder, Material, Profile, ReviewEntry, Settings } from '../shared/types.ts';
 
 export interface Data {
   version: 1;
   decks: Deck[];
+  folders: Folder[];
   cards: Card[];
   materials: Material[];
   reviews: ReviewEntry[];
@@ -74,6 +75,7 @@ function emptyData(): Data {
   return {
     version: 1,
     decks: [],
+    folders: [],
     cards: [],
     materials: [],
     reviews: [],

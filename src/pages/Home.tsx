@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { api } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
+import { DeckBrowser } from '../components/DeckBrowser.tsx';
 import { ImportModal } from '../components/ImportModal.tsx';
 import { Icon } from '../components/icons.tsx';
 import { PokeableMascot } from '../components/Mascot.tsx';
-import { CountUp, EmptyState, Modal, ProgressBar, Ring } from '../components/ui.tsx';
+import { CountUp, Modal, ProgressBar, Ring } from '../components/ui.tsx';
 import { confetti } from '../fx.ts';
 import { sfx } from '../sound.ts';
 
@@ -144,46 +145,7 @@ export function Home() {
         </div>
       </section>
 
-      <section>
-        <div className="section-head">
-          <h2>Your decks</h2>
-          <button className="btn ghost" onClick={() => setImporting(true)}>
-            <Icon name="plus" /> New deck
-          </button>
-        </div>
-        {s.decks.length === 0 ? (
-          <EmptyState mood="wow" title="No decks yet">
-            <p className="muted">Upload a PDF, paste notes, drop a link, or just name a topic. Claude writes the cards.</p>
-            <button className="btn primary big" onClick={() => setImporting(true)}>
-              ✨ Create your first deck
-            </button>
-          </EmptyState>
-        ) : (
-          <div className="deck-grid">
-            {s.decks.map((d) => (
-              <button key={d.id} className="deck-card" onClick={() => navigate(`/deck/${d.id}`)}>
-                <div className="deck-top">
-                  <span className="deck-emoji">{d.emoji}</span>
-                  <div className="deck-meta">
-                    {d.dueCount > 0 && <span className="badge due">{d.dueCount} due</span>}
-                    {d.newCount > 0 && <span className="badge new">{d.newCount} new</span>}
-                  </div>
-                </div>
-                <div>
-                  <div className="deck-title">{d.title}</div>
-                  <div className="deck-meta">
-                    {d.cardCount === 0 ? 'No cards yet' : `${d.cardCount} card${d.cardCount === 1 ? '' : 's'}`}
-                  </div>
-                </div>
-                <div className="deck-progress" title="Mastered">
-                  <ProgressBar value={d.mastery} height={3} />
-                  <span>{Math.round(d.mastery * 100)}%</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+      <DeckBrowser folderId={null} />
 
       {importing && <ImportModal onClose={() => setImporting(false)} onDone={(r) => navigate(`/deck/${r.deck.id}`)} />}
       {chestLoot && (

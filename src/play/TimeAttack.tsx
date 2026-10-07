@@ -6,20 +6,21 @@ import { EmptyState, Spinner } from '../components/ui.tsx';
 import { floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { ComboMeter, PlayHeader, QuestionView, Results, buildQuestion, useSession, type AnswerOutcome } from './common.tsx';
+import { type Scope, scopeBackLabel, scopeHome } from '../scope.ts';
 
 const DURATION = 60_000;
 const WRONG_PENALTY = 3_000;
 const CORRECT_BONUS = 1_000;
 
-export function TimeAttack({ deckId }: { deckId: string | null }) {
+export function TimeAttack({ scope }: { scope: Scope }) {
   const [run, setRun] = useState(0);
-  return <TimeAttackRun key={run} deckId={deckId} onRestart={() => setRun((r) => r + 1)} />;
+  return <TimeAttackRun key={run} scope={scope} onRestart={() => setRun((r) => r + 1)} />;
 }
 
-function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart: () => void }) {
+function TimeAttackRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) {
   const s = useAppState();
   const { showError } = useApp();
-  const session = useSession('timeattack', deckId, false);
+  const session = useSession('timeattack', scope, false);
   const [data, setData] = useState<StudyData | null>(null);
   const [started, setStarted] = useState(false);
   const [pos, setPos] = useState(0);
@@ -34,8 +35,8 @@ function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart
   const lastTick = useRef(0);
 
   useEffect(() => {
-    api.study('timeattack', deckId).then(setData).catch(showError);
-  }, [deckId, showError]);
+    api.study('timeattack', scope).then(setData).catch(showError);
+  }, [scope, showError]);
 
   const remaining = Math.max(0, deadline - now);
 
@@ -103,8 +104,8 @@ function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart
       <div className="play center">
         <EmptyState mood="sleepy" title="No cards to play yet">
           <p className="muted">Add some cards and study them first, then come back.</p>
-          <button className="btn primary" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
-            {deckId ? 'Back to deck' : 'Home'}
+          <button className="btn primary" onClick={() => navigate(scopeHome(scope))}>
+            {scopeBackLabel(scope)}
           </button>
         </EmptyState>
       </div>
@@ -119,7 +120,7 @@ function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart
             reward={reward}
             title={`⏱️ Score: ${score}`}
             subtitle={reward.newRecord ? undefined : `Personal best: ${s.profile.stats.timeAttackBest}`}
-            deckId={deckId}
+            scope={scope}
             stats={[
               { label: 'Correct', value: score },
               { label: 'Answered', value: session.tally.current.answers },
@@ -149,7 +150,7 @@ function TimeAttackRun({ deckId, onRestart }: { deckId: string | null; onRestart
             Personal best: <b>{s.profile.stats.timeAttackBest}</b>
           </p>
           <div className="results-actions">
-            <button className="btn big" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+            <button className="btn big" onClick={() => navigate(scopeHome(scope))}>
               Back
             </button>
             <button
