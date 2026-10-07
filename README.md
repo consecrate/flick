@@ -144,14 +144,16 @@ Flick also accepts lettered options (`A) ...`) with an `Answer: B` line, and a r
 Scheduling uses [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs) with configurable desired retention (default 90%), max interval, short-term learning steps and fuzz. Arcade modes never change your schedule.
 
 ### Gamification
-- **XP and levels** with titles. Typed recall, new cards, combos and fast answers earn more; arcade answers earn half.
+- **XP and levels** up to 100, with a new rank every 5 levels (Fresh Recruit to Flick Immortal). Typed recall, new cards, combos and fast answers earn more; arcade answers earn half. At a steady 300 XP a day, level 30 takes about a year and level 100 over a decade.
+- **Journey** page: the road to level 100. Every level pays 10 coins × the level, and milestone levels unlock free hats for Flicky, themes and avatars.
+- **Monthly medals**: study on 10, 20 or 28 days in a calendar month for 🥉, 🥈 or 🥇. The medal cabinet keeps every month.
 - **Combo meter**: 🔥 builds with consecutive correct answers, with bursts every 5.
 - **Daily streak** with 🧊 streak freezes that cover missed days automatically.
 - **Daily XP goal** (ring on the home screen). Reaching it unlocks a 🎁 **treasure chest** with coins, hints and sometimes a freeze.
 - **Daily quests**: 3 random quests per day with coin rewards.
-- **Coins**: 1 per 10 XP, plus quests and chests. Spend them in the **Shop** on streak freezes, hint packs, 🚀 Double XP (15 min), color themes and avatars.
+- **Coins**: 1 per 10 XP, plus quests and chests. Spend them in the **Shop** on streak freezes, hint packs, 🚀 Double XP (15 min), hats and skins for Flicky, color themes (premium ones have a background pattern) and avatars. Pricier items go on sale at higher levels; the rarest skin costs 25,000 coins.
 - **Hints**: 50/50 for multiple choice, first-letter reveal for typed answers.
-- **26 achievements** (trophies).
+- **87 tiered trophies** in 20 families (right answers, streaks up to 1,000 days, study days, medals, mastered cards, levels and more). Each tier pays coins, and the top tiers take years.
 - **Arcade**
   - 🧩 **Match**: pair 6 questions with their answers against the clock (+2s per wrong pair). Personal best tracked.
   - ⏱️ **Time Attack**: 60 seconds of rapid multiple choice; +1s for each correct answer, −3s for each wrong one.

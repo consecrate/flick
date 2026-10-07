@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ACHIEVEMENTS, letterHint, matchAnswer, xpForAnswer } from '../../shared/game.ts';
+import { ACHIEVEMENTS, SHOP, letterHint, matchAnswer, xpForAnswer } from '../../shared/game.ts';
 import type { Reward, StudyMode } from '../../shared/types.ts';
 import { api, type CardView } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
@@ -475,8 +475,22 @@ export function Results({
       {levelUp && (
         <div className="banner levelup">
           ⭐ Level up! You reached <b>level {reward!.levelAfter}</b>
+          {reward!.levelCoins > 0 && <> · 🪙 +{reward!.levelCoins}</>}
         </div>
       )}
+      {reward?.rank && (
+        <div className="banner levelup">
+          {reward.rank.icon} New rank: <b>{reward.rank.title}</b>
+        </div>
+      )}
+      {reward?.unlocks.map((id) => {
+        const item = SHOP.find((i) => i.id === id);
+        return item ? (
+          <a key={id} className="banner unlock" href="#/shop">
+            {item.icon} Unlocked {item.kind === 'hat' ? 'a hat for Flicky' : `a new ${item.kind}`}: <b>{item.name}</b>
+          </a>
+        ) : null;
+      })}
       {streakUp && (
         <div className="banner streak">
           🔥 Streak extended to <b>{reward!.streakAfter} day{reward!.streakAfter === 1 ? '' : 's'}</b>
@@ -484,11 +498,16 @@ export function Results({
       )}
       {reward?.goalReached && <div className="banner goal">🎯 Daily goal reached! Your chest is waiting on the home screen.</div>}
       {reward?.newRecord && <div className="banner record">🏆 New personal record!</div>}
-      {achievements.map((a) => (
+      {achievements.slice(0, achievements.length > 4 ? 3 : 4).map((a) => (
         <div key={a!.id} className="banner achievement">
-          {a!.icon} Achievement unlocked: <b>{a!.name}</b>
+          {a!.icon} Achievement unlocked: <b>{a!.name}</b> · 🪙 +{a!.coins}
         </div>
       ))}
+      {achievements.length > 4 && (
+        <a className="banner achievement" href="#/achievements">
+          🏆 And {achievements.length - 3} more trophies
+        </a>
+      )}
       <div className="results-actions">
         <button className="btn big" onClick={() => navigate(scopeHome(scope))}>
           {scopeBackLabel(scope)}

@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ACHIEVEMENTS, SHOP, addDays, checkAchievements, effectiveStreak, levelInfo, localDay, masteryTier, rollChest } from '../shared/game.ts';
+import { ACHIEVEMENTS, SHOP, addDays, checkAchievements, effectiveStreak, levelInfo, localDay, masteryTier, ownsItem, rollChest } from '../shared/game.ts';
 import { canMoveFolder } from '../shared/folders.ts';
 import { isValidModel, type Card, type Deck, type Folder, type Material, type SessionComplete, type Settings, type AnswerRequest } from '../shared/types.ts';
 import { MAX_OPTIONS, normalizeLang, parseMcqs } from '../shared/mcq.ts';
@@ -12,6 +12,7 @@ import { DATA_DIR, db, replaceAll, save, uid, type Data } from './db.ts';
 import { setupDesktop } from './desktop.ts';
 import {
   BOSS_MIN_CARDS,
+  achievementContext,
   aheadQueue,
   applyAnswer,
   bossQueue,
@@ -178,6 +179,7 @@ app.get('/api/state', (req, res) => {
     chestOpenedToday: p.chestDays.includes(day),
     streakAtRisk: p.streak.lastDay !== day && effectiveStreak(p.streak, day) > 0,
     doubleXpActive: !!p.doubleXpUntil && new Date(p.doubleXpUntil).getTime() > Date.now(),
+    masteredCards: achievementContext().mastered,
   });
 });
 
@@ -577,8 +579,10 @@ app.post(
     if (q.claimed || q.progress < q.target) throw new HttpError(400, 'Quest not complete');
     q.claimed = true;
     db.profile.coins += q.reward;
+    db.profile.stats.questsClaimed++;
+    const newAchievements = checkAchievements(db.profile);
     save();
-    res.json({ coins: q.reward });
+    res.json({ coins: q.reward, newAchievements });
   }),
 );
 
@@ -607,9 +611,11 @@ app.post(
     const item = SHOP.find((i) => i.id === req.body.itemId);
     if (!item) throw new HttpError(404, 'Item not found');
     const p = db.profile;
-    if ((item.kind === 'theme' || item.kind === 'avatar') && (p.owned.includes(item.id) || item.price === 0)) {
-      throw new HttpError(400, 'You already own this');
-    }
+    const cosmetic = item.kind === 'theme' || item.kind === 'avatar' || item.kind === 'hat' || item.kind === 'skin';
+    const level = levelInfo(p.xp).level;
+    if (item.price === 0) throw new HttpError(400, item.unlockLevel ? `This is a free reward at level ${item.unlockLevel}` : 'This one is free');
+    if (cosmetic && p.owned.includes(item.id)) throw new HttpError(400, 'You already own this');
+    if (item.unlockLevel && level < item.unlockLevel) throw new HttpError(400, `Reach level ${item.unlockLevel} to buy this`);
     if (item.id === 'freeze' && p.streak.freezes >= (item.max ?? 3)) throw new HttpError(400, 'You already hold the maximum number of freezes');
     if (p.coins < item.price) throw new HttpError(400, 'Not enough coins');
     p.coins -= item.price;
@@ -622,6 +628,8 @@ app.post(
       p.owned.push(item.id);
       if (item.kind === 'theme') p.theme = item.id;
       if (item.kind === 'avatar') p.avatar = String(item.value);
+      if (item.kind === 'hat') p.hat = item.id;
+      if (item.kind === 'skin') p.skin = item.id;
     }
     p.stats.purchases++;
     const newAchievements = checkAchievements(p);
@@ -653,15 +661,28 @@ app.post(
     const p = db.profile;
     const b = req.body ?? {};
     if (typeof b.name === 'string' && b.name.trim()) p.name = b.name.trim().slice(0, 30);
+    const level = levelInfo(p.xp).level;
     if (typeof b.theme === 'string') {
       const item = SHOP.find((i) => i.id === b.theme && i.kind === 'theme');
-      if (!item || (item.price > 0 && !p.owned.includes(item.id))) throw new HttpError(400, 'Theme not owned');
+      if (!item || !ownsItem(p, item, level)) throw new HttpError(400, 'Theme not owned');
       p.theme = item.id;
     }
     if (typeof b.avatar === 'string') {
       const item = SHOP.find((i) => i.kind === 'avatar' && i.value === b.avatar);
-      if (b.avatar !== '⚡' && (!item || !p.owned.includes(item.id))) throw new HttpError(400, 'Avatar not owned');
+      if (b.avatar !== '⚡' && (!item || !ownsItem(p, item, level))) throw new HttpError(400, 'Avatar not owned');
       p.avatar = b.avatar;
+    }
+    if (b.hat === null) p.hat = null;
+    else if (typeof b.hat === 'string') {
+      const item = SHOP.find((i) => i.id === b.hat && i.kind === 'hat');
+      if (!item || !ownsItem(p, item, level)) throw new HttpError(400, 'Hat not owned');
+      p.hat = item.id;
+    }
+    if (b.skin === null) p.skin = null;
+    else if (typeof b.skin === 'string') {
+      const item = SHOP.find((i) => i.id === b.skin && i.kind === 'skin');
+      if (!item || !ownsItem(p, item, level)) throw new HttpError(400, 'Skin not owned');
+      p.skin = item.id;
     }
     save();
     res.json({ ok: true });

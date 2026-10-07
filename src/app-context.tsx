@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ACHIEVEMENTS, SHOP } from '../shared/game.ts';
 import { ApiError, api, type AppState } from './api.ts';
 import { Icon } from './components/icons.tsx';
+import { patternImage } from './theme-patterns.ts';
 import { setSoundEnabled, setSoundVolume, sfx } from './sound.ts';
 
 // ---------- routing (hash based, so the server needs no rewrites) ----------
@@ -59,6 +60,16 @@ export function useAppState(): AppState {
   return state;
 }
 
+/** The hat Flicky wears, safe to call before state has loaded. */
+export function useEquippedHat(): string | null {
+  return useContext(AppContext)?.state?.profile.hat ?? null;
+}
+
+/** The skin Flicky wears, safe to call before state has loaded. */
+export function useEquippedSkin(): string | null {
+  return useContext(AppContext)?.state?.profile.skin ?? null;
+}
+
 function applyTheme(themeId: string) {
   const item = SHOP.find((i) => i.id === themeId) ?? SHOP.find((i) => i.id === 'theme-midnight')!;
   const [bg, surface, accent, ink] = item.value as string[];
@@ -67,6 +78,7 @@ function applyTheme(themeId: string) {
   root.setProperty('--surface', surface);
   root.setProperty('--accent', accent);
   root.setProperty('--ink', ink);
+  root.setProperty('--bg-pattern', patternImage(item.pattern, accent));
   // Light text means a dark theme; native controls and scrollbars follow.
   root.setProperty('color-scheme', parseInt(ink.slice(1, 3), 16) > 128 ? 'dark' : 'light');
 }
@@ -110,14 +122,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const announceAchievements = useCallback(
     (ids: string[]) => {
-      ids.forEach((id, i) => {
-        const a = ACHIEVEMENTS.find((x) => x.id === id);
-        if (!a) return;
+      const list = ids.map((id) => ACHIEVEMENTS.find((x) => x.id === id)).filter((a) => !!a);
+      // A big batch (say, after an update adds new tiers) gets one summary toast instead of a long queue.
+      const shown = list.length > 3 ? list.slice(0, 2) : list;
+      shown.forEach((a, i) => {
         setTimeout(() => {
           sfx.unlock();
-          toast({ icon: a.icon, title: `Achievement unlocked: ${a.name}`, body: a.desc, kind: 'achievement' });
+          toast({ icon: a.icon, title: `Achievement unlocked: ${a.name}`, body: `${a.desc} · 🪙 +${a.coins}`, kind: 'achievement' });
         }, i * 700);
       });
+      const rest = list.slice(shown.length);
+      if (rest.length) {
+        setTimeout(() => {
+          sfx.unlock();
+          toast({
+            icon: '🏆',
+            title: `${rest.length} more trophies unlocked`,
+            body: `🪙 +${rest.reduce((sum, a) => sum + a.coins, 0)}. See them all on the Trophies page.`,
+            kind: 'achievement',
+          });
+        }, shown.length * 700);
+      }
     },
     [toast],
   );

@@ -6,8 +6,11 @@ import {
   bumpStreak,
   checkAchievements,
   effectiveStreak,
+  levelCoins,
   levelInfo,
+  levelUpRewards,
   masteryScore,
+  masteryTier,
   questsForDay,
   ratingFromAnswer,
   xpForAnswer,
@@ -58,7 +61,14 @@ function grantXp(raw: number, day: string): number {
   p.coins += Math.floor(p.xp / 10) - Math.floor(before / 10);
   p.dailyXp[day] = (p.dailyXp[day] ?? 0) + xp;
   if (xp > 0) bumpStreak(p.streak, day);
+  const level = levelInfo(p.xp).level;
+  while (p.levelPaid < level) p.coins += levelCoins(++p.levelPaid);
   return xp;
+}
+
+/** Facts for trophies that look past the profile, such as how many cards are mastered. */
+export function achievementContext() {
+  return { mastered: db.cards.filter((c) => !c.suspended && masteryTier(c.srs) === 4).length };
 }
 
 export function applyAnswer(req: AnswerRequest): AnswerResult {
@@ -120,7 +130,7 @@ export function applyAnswer(req: AnswerRequest): AnswerResult {
     });
   }
 
-  const newAchievements = checkAchievements(p);
+  const newAchievements = checkAchievements(p, achievementContext());
   save();
   return { xp, rating, card, newAchievements, questsCompleted, doubleXp: doubleXpActive(p) };
 }
@@ -178,16 +188,22 @@ export function completeSession(s: SessionComplete): Reward {
 
   const bonusXp = bonus > 0 ? grantXp(bonus, s.day) : 0;
   questsCompleted.push(...progressQuests('xp', bonusXp));
-  const newAchievements = checkAchievements(p);
+  const newAchievements = checkAchievements(p, achievementContext());
   const goal = db.settings.dailyGoalXp;
+  const levelBefore = levelInfo(xpBefore).level;
+  const levelAfter = levelInfo(p.xp).level;
+  const gained = levelUpRewards(levelBefore, levelAfter);
   save();
   return {
     bonusXp,
     bonusReasons,
     totalXp: s.sessionXp + bonusXp,
     coins: Math.floor(p.xp / 10) - Math.floor(xpBefore / 10),
-    levelBefore: levelInfo(xpBefore).level,
-    levelAfter: levelInfo(p.xp).level,
+    levelBefore,
+    levelAfter,
+    levelCoins: gained.coins,
+    unlocks: gained.unlocks,
+    rank: gained.rank && { title: gained.rank.title, icon: gained.rank.icon },
     streakBefore,
     streakAfter: effectiveStreak(p.streak, s.day),
     newAchievements,

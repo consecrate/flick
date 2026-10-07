@@ -1,27 +1,70 @@
 // Flicky, the flashcard mascot. Drawn in the theme accent so it matches every theme.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { useEquippedHat, useEquippedSkin } from '../app-context.tsx';
 import { sfx } from '../sound.ts';
+import { Hat } from './Hats.tsx';
+import { SKINS } from './Skins.tsx';
 
 export type Mood = 'happy' | 'sleepy' | 'sad' | 'wow';
 
-export function Mascot({ mood = 'happy', size = 120, className = '' }: { mood?: Mood; size?: number; className?: string }) {
-  const ink = 'var(--mascot-ink, #191f33)';
+/**
+ * `hat` and `skin` override what Flicky is wearing (null for none); by default
+ * Flicky wears the player's equipped hat and skin.
+ */
+export function Mascot({
+  mood = 'happy',
+  size = 120,
+  className = '',
+  hat,
+  skin,
+}: {
+  mood?: Mood;
+  size?: number;
+  className?: string;
+  hat?: string | null;
+  skin?: string | null;
+}) {
+  const equippedHat = useEquippedHat();
+  const equippedSkin = useEquippedSkin();
+  const clip = `flicky-${useId().replace(/[^\w-]/g, '')}`;
+  const wearing = hat === undefined ? equippedHat : hat;
+  const look = SKINS[(skin === undefined ? equippedSkin : skin) ?? ''];
+  const ink = look?.ink ?? 'var(--mascot-ink, #191f33)';
+  const mouth = look?.mouth ?? ink;
+  // Hats, ears and horns need headroom, so the drawing gets taller and keeps its width.
+  const top = Math.max(wearing ? 28 : 0, look?.headroom ?? 0);
   return (
-    <svg className={`mascot ${className}`} width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Flicky the flashcard">
+    <svg
+      className={`mascot ${className}`}
+      width={size}
+      height={(size * (120 + top)) / 120}
+      viewBox={`0 ${-top} 120 ${120 + top}`}
+      role="img"
+      aria-label="Flicky the flashcard"
+    >
       <ellipse cx="60" cy="112" rx="30" ry="4" fill="var(--ink)" opacity="0.08" />
       {/* the card behind */}
-      <rect x="22" y="18" width="62" height="80" rx="14" fill="var(--accent-soft-strong)" transform="rotate(-10 53 58)" />
+      <rect x="22" y="18" width="62" height="80" rx="14" fill={look?.back ?? 'var(--accent-soft-strong)'} transform="rotate(-10 53 58)" />
       {/* Flicky */}
       <g transform="rotate(6 64 60)">
-        <rect x="32" y="16" width="64" height="84" rx="16" fill="var(--accent)" />
-        <rect x="32" y="16" width="64" height="84" rx="16" fill="none" stroke={ink} strokeOpacity="0.12" strokeWidth="2" />
+        {look?.behind}
+        <rect x="32" y="16" width="64" height="84" rx="16" fill={look?.body ?? 'var(--accent)'} />
+        {look?.pattern && (
+          <>
+            <clipPath id={clip}>
+              <rect x="32" y="16" width="64" height="84" rx="16" />
+            </clipPath>
+            <g clipPath={`url(#${clip})`}>{look.pattern}</g>
+          </>
+        )}
+        <rect x="32" y="16" width="64" height="84" rx="16" fill="none" stroke={ink} strokeOpacity={look ? 0.5 : 0.12} strokeWidth="2" />
         {/* bolt on the forehead */}
-        <path d="M66 22 57 36h7l-3 9 10-14h-7l2-9z" fill="#ffd23f" stroke={ink} strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M66 22 57 36h7l-3 9 10-14h-7l2-9z" fill={look?.bolt ?? '#ffd23f'} stroke={ink} strokeWidth="1.5" strokeLinejoin="round" />
         {mood === 'sleepy' ? (
           <>
-            <path d="M44 56q5 4 10 0" stroke={ink} strokeWidth="3" fill="none" strokeLinecap="round" />
-            <path d="M74 56q5 4 10 0" stroke={ink} strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M44 56q5 4 10 0" stroke={mouth} strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M74 56q5 4 10 0" stroke={mouth} strokeWidth="3" fill="none" strokeLinecap="round" />
           </>
         ) : (
           <>
@@ -35,10 +78,12 @@ export function Mascot({ mood = 'happy', size = 120, className = '' }: { mood?: 
         )}
         <circle cx="41" cy="68" r="4.5" fill="#ff7aa8" opacity="0.6" />
         <circle cx="87" cy="68" r="4.5" fill="#ff7aa8" opacity="0.6" />
-        {mood === 'happy' && <path d="M56 70q8 8 16 0" stroke={ink} strokeWidth="3" fill="none" strokeLinecap="round" />}
-        {mood === 'sleepy' && <path d="M59 72q5 3 10 0" stroke={ink} strokeWidth="3" fill="none" strokeLinecap="round" />}
-        {mood === 'sad' && <path d="M57 75q7-6 14 0" stroke={ink} strokeWidth="3" fill="none" strokeLinecap="round" />}
-        {mood === 'wow' && <ellipse cx="64" cy="73" rx="5" ry="6" fill={ink} />}
+        {mood === 'happy' && <path d="M56 70q8 8 16 0" stroke={mouth} strokeWidth="3" fill="none" strokeLinecap="round" />}
+        {mood === 'sleepy' && <path d="M59 72q5 3 10 0" stroke={mouth} strokeWidth="3" fill="none" strokeLinecap="round" />}
+        {mood === 'sad' && <path d="M57 75q7-6 14 0" stroke={mouth} strokeWidth="3" fill="none" strokeLinecap="round" />}
+        {mood === 'wow' && <ellipse cx="64" cy="73" rx="5" ry="6" fill={mouth} />}
+        {look?.front}
+        {wearing && <Hat id={wearing} />}
       </g>
       {mood === 'sleepy' && (
         <text x="96" y="22" fontFamily="var(--display)" fontWeight="700" fontSize="16" fill="var(--muted)">
