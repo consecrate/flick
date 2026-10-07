@@ -3,18 +3,22 @@ import type { Reward } from '../../shared/types.ts';
 import { api, type CardView } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
-import { CodeBlock, Inline, RichText } from '../components/Code.tsx';
-import { EmptyState, ProgressBar, Spinner } from '../components/ui.tsx';
+import { CodeBlock } from '../components/Code.tsx';
+import { Markdown } from '../components/Markdown.tsx';
+import { EmptyState, ProgressBar, Spinner } from '../components/shared.tsx';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { floatText } from '../fx.ts';
 import { sfx } from '../sound.ts';
-import { ComboMeter, PlayHeader, Results, useSession } from './common.tsx';
+import { ComboMeter, PlayHeader, PlayShell, PlaySub, Results, useSession } from './common.tsx';
 import { type Scope, scopeHome } from '../scope.ts';
 
 const RATINGS = [
-  { r: 1, label: 'Again', key: '1', cls: 'again' },
-  { r: 2, label: 'Hard', key: '2', cls: 'hard' },
-  { r: 3, label: 'Good', key: '3', cls: 'goodr' },
-  { r: 4, label: 'Easy', key: '4', cls: 'easy' },
+  { r: 1, label: 'Again', key: '1', cls: 'bg-destructive-soft border-[color-mix(in_srgb,var(--bad)_30%,var(--surface))]' },
+  { r: 2, label: 'Hard', key: '2', cls: 'bg-warning-soft border-[color-mix(in_srgb,var(--warn)_35%,var(--surface))]' },
+  { r: 3, label: 'Good', key: '3', cls: 'bg-success-soft border-[color-mix(in_srgb,var(--good)_30%,var(--surface))]' },
+  { r: 4, label: 'Easy', key: '4', cls: 'bg-accent border-[color-mix(in_srgb,var(--accent)_30%,var(--surface))]' },
 ] as const;
 
 export function Flashcards({ scope }: { scope: Scope }) {
@@ -107,16 +111,16 @@ function FlashRun({ scope, onRestart }: { scope: Scope; onRestart: () => void })
 
   if (!queue) {
     return (
-      <div className="play center">
-        <Spinner />
-      </div>
+      <PlayShell center>
+        <Spinner className="size-6" />
+      </PlayShell>
     );
   }
 
   if (done) {
     const t = session.tally.current;
     return (
-      <div className="play">
+      <PlayShell>
         <Results
           reward={reward}
           title="Deck flipped!"
@@ -129,96 +133,102 @@ function FlashRun({ scope, onRestart }: { scope: Scope; onRestart: () => void })
           onAgain={onRestart}
           againLabel="Keep going"
         />
-      </div>
+      </PlayShell>
     );
   }
 
   if (!card) {
     return (
-      <div className="play">
+      <PlayShell>
         <EmptyState mood="sleepy" title="Nothing due right now">
-          <div className="row center-row">
-            <button className="btn" onClick={() => navigate(scopeHome(scope))}>
-              Back
-            </button>
-            <button className="btn primary" onClick={() => void load(true)}>
-              Review ahead anyway
-            </button>
-          </div>
+          <Button onClick={() => navigate(scopeHome(scope))}>Back</Button>
+          <Button variant="default" onClick={() => void load(true)}>
+            Review ahead anyway
+          </Button>
         </EmptyState>
-      </div>
+      </PlayShell>
     );
   }
 
+  const tall = !!(card.code || card.mcq);
+  const face = cn(
+    'flip-face absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border-[3px] p-8 text-center max-[560px]:p-5',
+    tall && 'items-stretch justify-start overflow-y-auto text-left',
+  );
+  const flip = () => {
+    if (!flipped) {
+      sfx.flip();
+      setFlipped(true);
+    }
+  };
+
   return (
-    <div className="play">
+    <PlayShell>
       <PlayHeader onQuit={() => (session.tally.current.answers > 0 ? void finish() : navigate(scopeHome(scope)))}>
-        <ProgressBar value={pos} max={queue.length} height={14} className="grow" />
-        <span className="muted small">
+        <ProgressBar value={pos} max={queue.length} className="h-3.5 flex-1" />
+        <span className="num text-sm text-muted-foreground">
           {pos + 1}/{queue.length}
         </span>
       </PlayHeader>
-      <div className="play-sub">
+      <PlaySub>
         <ComboMeter combo={session.combo} />
-        {ahead && <span className="chip">Reviewing ahead</span>}
-        {card.srs.state === 0 && <span className="chip new-chip">New card</span>}
-      </div>
-      <div
-        className={`flip-card ${flipped ? 'flipped' : ''} ${card.code || card.mcq ? 'tall' : ''}`}
-        onClick={() => {
-          if (!flipped) {
-            sfx.flip();
-            setFlipped(true);
-          }
-        }}
-      >
-        <div className="flip-inner">
-          <div className="flip-face front">
-            {card.title && <span className="q-title">{card.title}</span>}
-            {card.mcq || card.code ? <RichText className="q-front" text={card.front} /> : <div className="q-front">{card.front}</div>}
+        {ahead && <Badge>Reviewing ahead</Badge>}
+        {card.srs.state === 0 && <Badge variant="warning">New card</Badge>}
+      </PlaySub>
+      <div data-quiet data-flipped={flipped} className={cn('flip-card mt-3 cursor-pointer', tall ? 'h-[480px]' : 'h-80')} onClick={flip}>
+        <div className="flip-inner relative size-full">
+          <div className={cn(face, 'border-border bg-card shadow-[0_5px_0_var(--border-strong)]')}>
+            {card.title && (
+              <Badge variant="brand" className={cn('text-sm', tall && 'self-start')}>
+                {card.title}
+              </Badge>
+            )}
+            <Markdown className={cn('font-display font-semibold', tall ? 'text-lg leading-snug' : 'text-[30px] leading-tight')} text={card.front} />
             {card.code && <CodeBlock code={card.code} lang={card.codeLang} compact />}
-            <div className="muted small">Click or press Space to flip</div>
+            <div className="text-sm text-muted-foreground">Click or press Space to flip</div>
           </div>
-          <div className="flip-face back">
-            <div className="muted small">{card.title ?? card.front}</div>
-            <div className="flip-answer">
-              <Inline text={card.back} />
-            </div>
-            {card.explanation && <RichText className="feedback-expl" text={card.explanation} />}
-            <button
-              className="btn ghost small"
+          <div className={cn(face, 'back border-primary bg-accent')}>
+            <Markdown className="text-sm text-muted-foreground" text={card.title ?? card.front} />
+            <Markdown className={cn('font-display font-bold', tall ? 'text-xl' : 'text-[32px] leading-tight')} text={card.back} />
+            {card.explanation && <Markdown className="text-muted-foreground" text={card.explanation} />}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(tall && 'self-start')}
               onClick={(e) => {
                 e.stopPropagation();
                 setExplain(true);
               }}
             >
               💬 Ask Claude
-            </button>
+            </Button>
           </div>
         </div>
       </div>
-      <div className="rating-row" ref={ratingRef}>
+      <div className="mt-6 grid grid-cols-4 gap-2 max-[560px]:grid-cols-2" ref={ratingRef}>
         {flipped ? (
           RATINGS.map((x) => (
-            <button key={x.r} className={`rate-btn ${x.cls}`} onClick={() => rate(x.r)}>
-              <span className="rate-label">{x.label}</span>
-              <span className="rate-ivl">{card.previews?.[x.r] ?? ''}</span>
-              <span className="opt-key">{x.key}</span>
+            <button
+              key={x.r}
+              data-quiet
+              className={cn(
+                'relative flex flex-col items-center gap-0.5 rounded-lg border-2 px-4 py-3 text-foreground shadow-ledge transition-transform duration-150 ease-bounce hover:-translate-y-0.5',
+                x.cls,
+              )}
+              onClick={() => rate(x.r)}
+            >
+              <span className="font-display text-md font-semibold">{x.label}</span>
+              <span className="text-xs text-muted-foreground">{card.previews?.[x.r] ?? ''}</span>
+              <span className="absolute top-3 right-3 grid size-[18px] place-items-center rounded-full bg-card/70 font-display text-xs font-semibold text-muted-foreground">{x.key}</span>
             </button>
           ))
         ) : (
-          <button
-            className="btn primary big"
-            onClick={() => {
-              sfx.flip();
-              setFlipped(true);
-            }}
-          >
+          <Button variant="default" size="lg" className="col-span-full justify-self-center" onClick={flip}>
             Show answer
-          </button>
+          </Button>
         )}
       </div>
       {explain && <ExplainModal card={card} onClose={() => setExplain(false)} />}
-    </div>
+    </PlayShell>
   );
 }

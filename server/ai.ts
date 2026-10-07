@@ -1,7 +1,7 @@
 // Prompts and schemas for every AI feature.
 
 import type { ModelChoice } from '../shared/types.ts';
-import { EXPLANATION_GUIDE, FLASHCARD_GUIDE, WRITING_GUIDE, normalizeLang } from '../shared/mcq.ts';
+import { EXPLANATION_GUIDE, FLASHCARD_GUIDE, MATH_GUIDE, WRITING_GUIDE, normalizeLang } from '../shared/mcq.ts';
 import { callClaude } from './claude.ts';
 
 /** Plain-English rules for every explanation Claude writes for a student. */
@@ -21,7 +21,7 @@ Field rules for every card:
 - "answer": the correct answer. For a flashcard, the short answer. For a multiple-choice question, the correct option.
 - "distractors": for a flashcard, exactly 3 wrong answers. For a multiple-choice question, the wrong options (2 to 7), each the answer one named misconception produces.
 - "hint": for a multiple-choice question, one sentence that points at the mechanism. For a flashcard, an empty string.
-- "explanation": as described above. Use Markdown: \`backticks\` for code, a "- " line per wrong option.
+- "explanation": as described above. Use Markdown: \`backticks\` for code, $LaTeX$ for math, a "- " line per wrong option.
 - No duplicates and no trivia about the document itself (page numbers, slide authors).
 - Write in the same language as the source material.`;
 
@@ -30,7 +30,9 @@ const DISTRACTOR_WRITER = `You are Flick's card author.
 
 ${FLASHCARD_GUIDE}
 
-${EXPLANATION_GUIDE}`;
+${EXPLANATION_GUIDE}
+
+${MATH_GUIDE}`;
 
 export interface GeneratedCard {
   front: string;
@@ -182,7 +184,7 @@ export async function gradeAnswer(opts: {
 }) {
   const res = await callClaude<{ correct: boolean; feedback: string }>({
     system:
-      'You grade flashcard answers fairly. Accept answers that show the student knows the fact: synonyms, paraphrases, minor misspellings, different word order, or extra correct detail. Reject answers that are wrong, too vague to show knowledge, or that miss the key part of the expected answer. Feedback: one short, friendly sentence addressed to the student.',
+      'You grade flashcard answers fairly. Accept answers that show the student knows the fact: synonyms, paraphrases, minor misspellings, different word order, or extra correct detail. Reject answers that are wrong, too vague to show knowledge, or that miss the key part of the expected answer. Feedback: one short, friendly sentence addressed to the student, in Markdown. Write any math in LaTeX between dollar signs ($x^2$), code in `backticks`, and a literal dollar sign as \\$.',
     prompt: `Question: ${opts.question}\nExpected answer: ${opts.expected}\nStudent answer: ${opts.given}`,
     model: opts.model,
     schema: {
@@ -221,7 +223,7 @@ export async function explainCard(opts: {
     opts.explanation && `Card note: ${opts.explanation}`,
   ].filter(Boolean);
   const res = await callClaude<string>({
-    system: `You are a friendly tutor inside a flashcard app. Assume the student is intelligent but new to the subject. ${PLAIN_ENGLISH} Use the same word for the same thing throughout. Answer in at most 180 words of Markdown: short paragraphs, bullets only for real lists, \`backticks\` for code. No preamble and no closing summary.`,
+    system: `You are a friendly tutor inside a flashcard app. Assume the student is intelligent but new to the subject. ${PLAIN_ENGLISH} Use the same word for the same thing throughout. Answer in at most 180 words of Markdown: short paragraphs, bullets only for real lists, \`backticks\` for code. Write math in LaTeX: $x^2$ inline, $$...$$ on its own line for a display equation, and a literal dollar sign as \\$. No preamble and no closing summary.`,
     prompt: `${card.join('\n')}\n\n${ask}`,
     model: opts.model,
     timeoutMs: 120_000,

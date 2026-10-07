@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { SendIcon } from 'lucide-react';
 import type { Card } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useApp } from '../app-context.tsx';
-import { Markdown, Modal, Spinner } from './ui.tsx';
+import { CodeBlock } from './Code.tsx';
+import { Markdown } from './Markdown.tsx';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 
 interface Turn {
   q: string | null;
@@ -10,12 +16,13 @@ interface Turn {
 }
 
 /** "Ask Claude" tutor for one card: an initial explanation, then follow-up questions. */
-export function ExplainModal({ card, onClose }: { card: Pick<Card, 'id' | 'front' | 'back' | 'explanation'>; onClose: () => void }) {
+export function ExplainModal({ card, onClose }: { card: Pick<Card, 'id' | 'front' | 'back' | 'explanation' | 'code' | 'codeLang'>; onClose: () => void }) {
   const { showError } = useApp();
   const [turns, setTurns] = useState<Turn[]>([{ q: null, a: null }]);
   const [input, setInput] = useState('');
   const busy = turns.some((t) => t.a === null);
   const started = useRef(false);
+  const end = useRef<HTMLDivElement>(null);
 
   const ask = async (q: string | null, index: number) => {
     try {
@@ -33,6 +40,10 @@ export function ExplainModal({ card, onClose }: { card: Pick<Card, 'id' | 'front
     void ask(null, 0);
   }, []);
 
+  useEffect(() => {
+    if (turns.length > 1) end.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [turns]);
+
   const send = () => {
     const q = input.trim();
     if (!q || busy) return;
@@ -43,36 +54,41 @@ export function ExplainModal({ card, onClose }: { card: Pick<Card, 'id' | 'front
   };
 
   return (
-    <Modal onClose={onClose} wide>
-      <div className="explain-card">
-        <div className="muted small">Question</div>
-        <div className="explain-front">{card.front}</div>
-        <div className="muted small">Answer</div>
-        <div className="explain-back">{card.back}</div>
-      </div>
-      <div className="explain-thread">
-        {turns.map((t, i) => (
-          <div key={i}>
-            {t.q && <div className="bubble me">{t.q}</div>}
-            <div className="bubble claude">
-              <span className="bubble-who">✨ Claude</span>
-              {t.a === null ? <Spinner /> : <Markdown text={t.a} />}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="w-[min(760px,calc(100%-2rem))]" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>💬 Ask Claude</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-1 rounded-md bg-muted px-4 py-3">
+          <div className="text-sm text-muted-foreground">Question</div>
+          <Markdown className="font-medium" text={card.front} />
+          {card.code && <CodeBlock code={card.code} lang={card.codeLang} compact />}
+          <div className="mt-1 text-sm text-muted-foreground">Answer</div>
+          <Markdown className="font-semibold text-success-ink" text={card.back} />
+        </div>
+        <div className="flex flex-col gap-3">
+          {turns.map((t, i) => (
+            <div key={i} className="flex flex-col gap-2">
+              {t.q && (
+                <div className="ml-auto w-fit max-w-[92%] rounded-[18px] rounded-br-md bg-primary px-4 py-3 text-primary-foreground">
+                  <Markdown text={t.q} />
+                </div>
+              )}
+              <div className="max-w-[92%] rounded-[18px] rounded-bl-md bg-muted px-4 py-3">
+                <span className="mb-1 block font-display text-sm font-semibold text-brand-ink">✨ Claude</span>
+                {t.a === null ? <Spinner /> : <Markdown text={t.a} />}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-      <div className="explain-input">
-        <input
-          className="input"
-          placeholder="Ask a follow-up… (e.g. give me a mnemonic)"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send()}
-        />
-        <button className="btn primary" disabled={busy || !input.trim()} onClick={send}>
-          Ask
-        </button>
-      </div>
-    </Modal>
+          ))}
+          <div ref={end} />
+        </div>
+        <div className="flex gap-2">
+          <Input placeholder="Ask a follow-up… (e.g. give me a mnemonic)" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} />
+          <Button variant="default" disabled={busy || !input.trim()} onClick={send}>
+            <SendIcon /> Ask
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

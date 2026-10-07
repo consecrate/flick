@@ -1,15 +1,21 @@
 // Decks and folders at one level of the folder tree, with drag and drop to
 // move them, plus the dialogs for making folders and moving things.
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type PointerEvent as ReactPointerEvent } from 'react';
 import { canMoveFolder, folderPath } from '../../shared/folders.ts';
 import type { DeckSummary, FolderSummary } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
 import { sfx } from '../sound.ts';
 import { ImportModal } from './ImportModal.tsx';
-import { Icon } from './icons.tsx';
-import { EmptyState, Modal, ProgressBar } from './ui.tsx';
+import { EmptyState, ProgressBar, SectionHead } from './shared.tsx';
+import { ArrowLeftIcon, PlusIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export interface MoveItem {
   kind: 'deck' | 'folder';
@@ -142,8 +148,11 @@ function useDrag(onDrop: (item: MoveItem, target: string | null) => void, folder
   };
 
   const ghost = dragging && (
-    <div className="drag-ghost" style={{ left: pos.x, top: pos.y }}>
-      <span>{dragging.emoji}</span>
+    <div
+      className="pointer-events-none fixed z-100 flex max-w-[260px] translate-x-2.5 translate-y-2.5 -rotate-3 items-center gap-2 overflow-hidden rounded-full border-2 border-primary bg-card py-2 pr-4 pl-2 font-display font-semibold text-ellipsis whitespace-nowrap shadow-overlay"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      <span className="grid size-[30px] flex-none place-items-center rounded-[10px] bg-accent text-lg">{dragging.emoji}</span>
       {dragging.title}
     </div>
   );
@@ -170,93 +179,67 @@ export function DeckBrowser({ folderId }: { folderId: string | null }) {
 
   return (
     <section>
-      <div className="section-head">
-        <h2>{folderId ? 'Inside' : 'Your decks'}</h2>
-        <div className="row">
-          {folders.length > 0 && <span className="muted small drag-hint">Drag a deck onto a folder to move it</span>}
-          <button className="btn ghost" onClick={() => setCreatingFolder(true)}>
+      <SectionHead title={folderId ? 'Inside' : 'Your decks'}>
+        <div className="flex flex-wrap items-center gap-2">
+          {folders.length > 0 && <span className="self-center text-sm text-muted-foreground max-[860px]:hidden">Drag a deck onto a folder to move it</span>}
+          <Button variant="ghost" onClick={() => setCreatingFolder(true)}>
             📁 New folder
-          </button>
-          <button className="btn ghost" onClick={() => setImporting(true)}>
-            <Icon name="plus" /> New deck
-          </button>
+          </Button>
+          <Button variant="ghost" onClick={() => setImporting(true)}>
+            <PlusIcon /> New deck
+          </Button>
         </div>
-      </div>
+      </SectionHead>
       {empty ? (
         folderId ? (
-          <EmptyState icon="📂" title="This folder is empty">
-            <p className="muted">Make a deck here, or drag decks in from another folder.</p>
-            <div className="row center-row">
-              <button className="btn" onClick={() => setCreatingFolder(true)}>
-                📁 New folder
-              </button>
-              <button className="btn primary" onClick={() => setImporting(true)}>
-                ✨ New deck
-              </button>
-            </div>
+          <EmptyState icon="📂" title="This folder is empty" description="Make a deck here, or drag decks in from another folder.">
+            <Button onClick={() => setCreatingFolder(true)}>📁 New folder</Button>
+            <Button variant="default" onClick={() => setImporting(true)}>
+              ✨ New deck
+            </Button>
           </EmptyState>
         ) : (
-          <EmptyState mood="wow" title="No decks yet">
-            <p className="muted">Upload a PDF, paste notes, drop a link, or just name a topic. Claude writes the cards.</p>
-            <button className="btn primary big" onClick={() => setImporting(true)}>
+          <EmptyState mood="wow" title="No decks yet" description="Upload a PDF, paste notes, drop a link, or just name a topic. Claude writes the cards.">
+            <Button variant="default" size="lg" onClick={() => setImporting(true)}>
               ✨ Create your first deck
-            </button>
+            </Button>
           </EmptyState>
         )
       ) : (
-        <div className="deck-grid">
+        <div className="stagger grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
           {folders.map((f) => (
-            <button
+            <DeckTile
               key={f.id}
-              className={`deck-card folder-card ${isDragged('folder', f.id) ? 'dragging' : ''}`}
+              folder
+              emoji={f.emoji}
+              title={f.title}
+              meta={
+                f.deckCount === 0 && f.folderCount === 0
+                  ? 'Empty folder'
+                  : [f.folderCount > 0 && plural(f.folderCount, 'folder'), plural(f.deckCount, 'deck'), plural(f.cardCount, 'card')].filter(Boolean).join(' · ')
+              }
+              due={f.dueCount}
+              fresh={f.newCount}
+              mastery={f.mastery}
+              dragged={isDragged('folder', f.id)}
               data-drop-folder={f.id}
               onPointerDown={(e) => start(e, folderItem(f, s.folders))}
               onClick={() => navigate(`/folder/${f.id}`)}
-            >
-              <div className="deck-top">
-                <span className="deck-emoji">{f.emoji}</span>
-                <div className="deck-meta">
-                  {f.dueCount > 0 && <span className="badge due">{f.dueCount} due</span>}
-                  {f.newCount > 0 && <span className="badge new">{f.newCount} new</span>}
-                </div>
-              </div>
-              <div>
-                <div className="deck-title">{f.title}</div>
-                <div className="deck-meta">
-                  {f.deckCount === 0 && f.folderCount === 0
-                    ? 'Empty folder'
-                    : [f.folderCount > 0 && plural(f.folderCount, 'folder'), plural(f.deckCount, 'deck'), plural(f.cardCount, 'card')].filter(Boolean).join(' · ')}
-                </div>
-              </div>
-              <div className="deck-progress" title="Mastered">
-                <ProgressBar value={f.mastery} height={3} />
-                <span>{Math.round(f.mastery * 100)}%</span>
-              </div>
-            </button>
+            />
           ))}
           {decks.map((d) => (
-            <button
+            <DeckTile
               key={d.id}
-              className={`deck-card ${isDragged('deck', d.id) ? 'dragging' : ''}`}
+              emoji={d.emoji}
+              title={d.title}
+              meta={d.cardCount === 0 ? 'No cards yet' : plural(d.cardCount, 'card')}
+              due={d.dueCount}
+              fresh={d.newCount}
+              mastery={d.mastery}
+              dragged={isDragged('deck', d.id)}
               onPointerDown={(e) => start(e, deckItem(d, s.folders))}
               onClick={() => navigate(`/deck/${d.id}`)}
-            >
-              <div className="deck-top">
-                <span className="deck-emoji">{d.emoji}</span>
-                <div className="deck-meta">
-                  {d.dueCount > 0 && <span className="badge due">{d.dueCount} due</span>}
-                  {d.newCount > 0 && <span className="badge new">{d.newCount} new</span>}
-                </div>
-              </div>
-              <div>
-                <div className="deck-title">{d.title}</div>
-                <div className="deck-meta">{d.cardCount === 0 ? 'No cards yet' : plural(d.cardCount, 'card')}</div>
-              </div>
-              <div className="deck-progress" title="Mastered">
-                <ProgressBar value={d.mastery} height={3} />
-                <span>{Math.round(d.mastery * 100)}%</span>
-              </div>
-            </button>
+            />
           ))}
         </div>
       )}
@@ -278,30 +261,88 @@ export function DeckBrowser({ folderId }: { folderId: string | null }) {
   );
 }
 
+/** A deck or folder card. Folders get a tab on top and accept drops. */
+function DeckTile({
+  folder,
+  emoji,
+  title,
+  meta,
+  due,
+  fresh,
+  mastery,
+  dragged,
+  ...props
+}: {
+  folder?: boolean;
+  emoji: string;
+  title: string;
+  meta: string;
+  due: number;
+  fresh: number;
+  mastery: number;
+  dragged: boolean;
+} & ComponentProps<'button'> & { 'data-drop-folder'?: string }) {
+  return (
+    <button
+      className={cn(
+        'deck-tile group relative flex flex-col gap-3 rounded-lg border-2 border-border bg-card px-6 pt-4 pb-6 text-left text-foreground shadow-ledge transition-[transform,border-color,box-shadow] duration-150 ease-bounce hover:-translate-y-1 hover:border-primary hover:shadow-ledge-lg',
+        folder && 'folder-tab mt-2.5 rounded-tl-sm',
+        dragged && 'opacity-35',
+      )}
+      {...props}
+    >
+      <div className="flex items-center justify-between">
+        <span className="grid size-[52px] place-items-center rounded-2xl bg-accent text-[30px] transition-transform duration-300 ease-bounce group-hover:scale-110 group-hover:-rotate-8">{emoji}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {due > 0 && <Badge variant="brand">{due} due</Badge>}
+          {fresh > 0 && <Badge variant="warning">{fresh} new</Badge>}
+        </div>
+      </div>
+      <div>
+        <div className="font-display text-lg font-semibold">{title}</div>
+        <div className="text-sm text-muted-foreground">{meta}</div>
+      </div>
+      <div className="flex items-center gap-3 font-display text-sm font-semibold text-muted-foreground" title="Mastered">
+        <ProgressBar value={mastery} className="h-[3px]" />
+        <span>{Math.round(mastery * 100)}%</span>
+      </div>
+    </button>
+  );
+}
+
 /** Breadcrumb from the top level to a folder. Every crumb except the last accepts drops. */
 export function FolderCrumbs({ folderId, current }: { folderId: string | null; current?: string }) {
   const s = useAppState();
   const path = folderPath(s.folders, folderId);
+  const drop = 'crumb-drop cursor-pointer';
   return (
-    <nav className="crumbs" aria-label="Folders">
-      <button className="crumb" data-drop-folder={ROOT} onClick={() => navigate('/')}>
-        <Icon name="back" size={14} /> All decks
-      </button>
-      {path.map((f) => (
-        <span key={f.id} className="crumb-wrap">
-          <span className="crumb-sep">/</span>
-          <button className="crumb" data-drop-folder={f.id} onClick={() => navigate(`/folder/${f.id}`)}>
-            {f.emoji} {f.title}
-          </button>
-        </span>
-      ))}
-      {current && (
-        <span className="crumb-wrap">
-          <span className="crumb-sep">/</span>
-          <span className="crumb current">{current}</span>
-        </span>
-      )}
-    </nav>
+    <Breadcrumb aria-label="Folders">
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild className={drop}>
+            <button data-drop-folder={ROOT} onClick={() => navigate('/')}>
+              <ArrowLeftIcon className="size-3.5" /> All decks
+            </button>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        {path.map((f) => (
+          <BreadcrumbItem key={f.id}>
+            <BreadcrumbSeparator />
+            <BreadcrumbLink asChild className={drop}>
+              <button data-drop-folder={f.id} onClick={() => navigate(`/folder/${f.id}`)}>
+                {f.emoji} {f.title}
+              </button>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+        ))}
+        {current && (
+          <BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbPage>{current}</BreadcrumbPage>
+          </BreadcrumbItem>
+        )}
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 }
 
@@ -325,26 +366,29 @@ function NewFolderModal({ parentId, onClose }: { parentId: string | null; onClos
   };
 
   return (
-    <Modal onClose={busy ? () => {} : onClose}>
-      <h2>New folder</h2>
-      <p className="muted">Group decks by class, exam or topic. You can study a whole folder at once.</p>
-      <input
-        className="input"
-        autoFocus
-        placeholder="Folder name, e.g. Biology 101"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && void create()}
-      />
-      <div className="modal-actions">
-        <button className="btn ghost" disabled={busy} onClick={onClose}>
-          Cancel
-        </button>
-        <button className="btn primary" disabled={busy || !title.trim()} onClick={() => void create()}>
-          Create folder
-        </button>
-      </div>
-    </Modal>
+    <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New folder</DialogTitle>
+          <DialogDescription>Group decks by class, exam or topic. You can study a whole folder at once.</DialogDescription>
+        </DialogHeader>
+        <Input
+          autoFocus
+          placeholder="Folder name, e.g. Biology 101"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && void create()}
+        />
+        <DialogFooter>
+          <Button variant="ghost" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="default" disabled={busy || !title.trim()} onClick={() => void create()}>
+            Create folder
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -372,32 +416,34 @@ export function MoveModal({ item, onClose, onMoved }: { item: MoveItem; onClose:
     onMoved?.();
   };
 
+  const row =
+    'flex items-center gap-3 rounded-md border-2 border-transparent px-3 py-2 text-left font-semibold text-foreground hover:not-disabled:border-primary hover:not-disabled:bg-accent disabled:cursor-default disabled:text-muted-foreground';
+  const here = <span className="ml-auto text-sm font-medium text-muted-foreground">Here now</span>;
+
   return (
-    <Modal onClose={busy ? () => {} : onClose}>
-      <h2>
-        Move {item.emoji} {item.title}
-      </h2>
-      <div className="move-list">
-        <button className="move-row" disabled={busy || item.from === null} onClick={() => void pick(null)}>
-          <span className="move-emoji">🏠</span>
-          Top level
-          {item.from === null && <span className="muted small">Here now</span>}
-        </button>
-        {rows.map(({ folder, depth }) => (
-          <button
-            key={folder.id}
-            className="move-row"
-            style={{ paddingLeft: `calc(var(--s3) + ${depth * 22}px)` }}
-            disabled={busy || folder.id === item.from}
-            onClick={() => void pick(folder.id)}
-          >
-            <span className="move-emoji">{folder.emoji}</span>
-            {folder.title}
-            {folder.id === item.from && <span className="muted small">Here now</span>}
+    <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+      <DialogContent aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>
+            Move {item.emoji} {item.title}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex max-h-[50vh] flex-col gap-0.5 overflow-y-auto">
+          <button className={row} disabled={busy || item.from === null} onClick={() => void pick(null)}>
+            <span className="grid size-8 flex-none place-items-center rounded-[10px] bg-muted text-lg">🏠</span>
+            Top level
+            {item.from === null && here}
           </button>
-        ))}
-      </div>
-      {rows.length === 0 && <p className="muted small">No folders yet. Make one with “New folder” on the home screen.</p>}
-    </Modal>
+          {rows.map(({ folder, depth }) => (
+            <button key={folder.id} className={row} style={{ paddingLeft: 12 + depth * 22 }} disabled={busy || folder.id === item.from} onClick={() => void pick(folder.id)}>
+              <span className="grid size-8 flex-none place-items-center rounded-[10px] bg-muted text-lg">{folder.emoji}</span>
+              {folder.title}
+              {folder.id === item.from && here}
+            </button>
+          ))}
+        </div>
+        {rows.length === 0 && <p className="text-sm text-muted-foreground">No folders yet. Make one with “New folder” on the home screen.</p>}
+      </DialogContent>
+    </Dialog>
   );
 }

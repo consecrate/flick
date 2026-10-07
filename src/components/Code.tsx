@@ -1,5 +1,4 @@
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
-import { normalizeLang } from '../../shared/mcq.ts';
+import { useEffect, useState } from 'react';
 
 type Hljs = typeof import('highlight.js').default;
 
@@ -78,67 +77,6 @@ export function CodeBlock({ code, lang, compact }: { code: string; lang?: string
         {/* highlight.js escapes the source, so its output is safe to insert. */}
         {html !== null ? <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} /> : <code>{code}</code>}
       </pre>
-    </div>
-  );
-}
-
-/** `code` and **bold** inside one line of text. */
-export function Inline({ text }: { text: string }) {
-  const parts: ReactNode[] = [];
-  const re = /`([^`\n]+)`|\*\*([^*\n]+)\*\*/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    parts.push(m[1] !== undefined ? <code key={m.index} className="inline-code">{m[1]}</code> : <b key={m.index}>{m[2]}</b>);
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return <>{parts}</>;
-}
-
-/**
- * Small Markdown subset used in questions, options and explanations: fenced
- * code blocks (highlighted), inline code and bold. Line breaks are kept.
- */
-export function RichText({ text, className }: { text: string; className?: string }) {
-  const blocks: ({ kind: 'text'; text: string } | { kind: 'code'; lang?: string; code: string })[] = [];
-  const lines = text.split('\n');
-  let buf: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const open = lines[i].match(/^\s*(`{3,}|~{3,})\s*([\w+#.-]*)\s*$/);
-    if (!open) {
-      buf.push(lines[i]);
-      continue;
-    }
-    const close = lines.findIndex((l, j) => j > i && l.trim().startsWith(open[1]) && l.trim().replace(/[`~]/g, '') === '');
-    if (close < 0) {
-      buf.push(lines[i]);
-      continue;
-    }
-    if (buf.join('').trim()) blocks.push({ kind: 'text', text: buf.join('\n').trim() });
-    buf = [];
-    blocks.push({ kind: 'code', lang: normalizeLang(open[2]), code: lines.slice(i + 1, close).join('\n') });
-    i = close;
-  }
-  if (buf.join('').trim()) blocks.push({ kind: 'text', text: buf.join('\n').trim() });
-
-  return (
-    <div className={`rich ${className ?? ''}`}>
-      {blocks.map((b, i) =>
-        b.kind === 'code' ? (
-          <CodeBlock key={i} code={b.code} lang={b.lang} compact />
-        ) : (
-          <p key={i}>
-            {b.text.split('\n').map((l, j) => (
-              <Fragment key={j}>
-                {j > 0 && <br />}
-                <Inline text={l} />
-              </Fragment>
-            ))}
-          </p>
-        ),
-      )}
     </div>
   );
 }

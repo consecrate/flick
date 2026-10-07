@@ -1,9 +1,18 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { buildImportPrompt, parseMcqs } from '../../shared/mcq.ts';
 import { api, type GenerateResult, type SourceInput } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
 import { sfx } from '../sound.ts';
-import { ClaudeLoader, Modal } from './ui.tsx';
+import { ClaudeLoader } from './shared.tsx';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 type Tab = 'files' | 'text' | 'url' | 'topic' | 'pairs' | 'mcq';
 
@@ -34,6 +43,10 @@ async function copyText(text: string) {
   }
 }
 
+/** Select items cannot have an empty value, so "Auto" has its own. */
+const AUTO = 'auto';
+const LEVELS = ['High school', 'Undergraduate', 'Graduate / professional', 'Beginner language learner'];
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.md,.csv,.tsv,.html,.srt,.vtt,.json';
@@ -56,7 +69,7 @@ export function ImportModal({ deckId, folderId, onClose, onDone }: { deckId?: st
   const [topic, setTopic] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [focus, setFocus] = useState('');
-  const [level, setLevel] = useState('');
+  const [level, setLevel] = useState(AUTO);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -64,7 +77,7 @@ export function ImportModal({ deckId, folderId, onClose, onDone }: { deckId?: st
   const [mcqTopic, setMcqTopic] = useState('');
   const [copied, setCopied] = useState(false);
   const [blank, setBlank] = useState(false);
-  const prompt = useMemo(() => buildImportPrompt({ topic: mcqTopic, level }), [mcqTopic, level]);
+  const prompt = useMemo(() => buildImportPrompt({ topic: mcqTopic, level: level === AUTO ? '' : level }), [mcqTopic, level]);
   const parsed = useMemo(() => (tab === 'mcq' && mcqText.trim() ? parseMcqs(mcqText) : null), [tab, mcqText]);
 
   const copyPrompt = async () => {
@@ -108,7 +121,7 @@ export function ImportModal({ deckId, folderId, onClose, onDone }: { deckId?: st
       else if (tab === 'topic') source = { type: 'topic', topic };
       else if (tab === 'pairs') source = { type: 'pairs', text };
       else source = { type: 'mcq', text: mcqText };
-      const r = await api.generate({ deckId, source, focus: focus || undefined, level: level || undefined, title: title || undefined });
+      const r = await api.generate({ deckId, source, focus: focus || undefined, level: level === AUTO ? undefined : level, title: title || undefined });
       sfx.unlock();
       toast({ title: `${r.added} cards added to ${r.deck.title}`, kind: 'success' });
       if (r.skipped) toast({ title: `${r.skipped} card${r.skipped === 1 ? '' : 's'} skipped`, body: 'They were not in the expected format.' });
@@ -140,210 +153,234 @@ export function ImportModal({ deckId, folderId, onClose, onDone }: { deckId?: st
     }
   };
 
+  const close = () => !busy && onClose();
+
   if (blank) {
     return (
-      <Modal onClose={busy ? () => {} : onClose}>
-        <h2>New empty deck</h2>
-        <p className="muted">Name it now and add cards whenever you are ready.</p>
-        <input
-          className="input"
-          autoFocus
-          placeholder="Deck title, e.g. Spanish verbs"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && title.trim() && !busy && void createEmpty()}
-        />
-        <div className="modal-actions">
-          <button className="btn ghost" disabled={busy} onClick={() => setBlank(false)}>
-            Back
-          </button>
-          <button className="btn primary" disabled={busy || !title.trim()} onClick={() => void createEmpty()}>
-            Create deck
-          </button>
-        </div>
-      </Modal>
+      <Dialog open onOpenChange={(open) => !open && close()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New empty deck</DialogTitle>
+            <DialogDescription>Name it now and add cards whenever you are ready.</DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            placeholder="Deck title, e.g. Spanish verbs"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && title.trim() && !busy && void createEmpty()}
+          />
+          <DialogFooter>
+            <Button variant="ghost" disabled={busy} onClick={() => setBlank(false)}>
+              Back
+            </Button>
+            <Button variant="default" disabled={busy || !title.trim()} onClick={() => void createEmpty()}>
+              Create deck
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     );
   }
 
+  const deckTitle = !deckId && <Input placeholder="Deck title" value={title} onChange={(e) => setTitle(e.target.value)} />;
+
   return (
-    <Modal onClose={busy ? () => {} : onClose} wide>
-      <h2>{deckId ? 'Add study material' : 'Create a deck'}</h2>
-      <p className="muted">Drop in anything you are studying. Claude covers all of it with a mix of flashcards and multiple-choice questions.</p>
-      {busy ? (
-        tab === 'pairs' || tab === 'mcq' ? (
-          <ClaudeLoader lines={['Importing your cards…']} />
+    <Dialog open onOpenChange={(open) => !open && close()}>
+      <DialogContent className="w-[min(760px,calc(100%-2rem))]" showCloseButton={!busy}>
+        <DialogHeader>
+          <DialogTitle>{deckId ? 'Add study material' : 'Create a deck'}</DialogTitle>
+          <DialogDescription>Drop in anything you are studying. Claude covers all of it with a mix of flashcards and multiple-choice questions.</DialogDescription>
+        </DialogHeader>
+        {busy ? (
+          tab === 'pairs' || tab === 'mcq' ? <ClaudeLoader lines={['Importing your cards…']} /> : <ClaudeLoader />
         ) : (
-          <ClaudeLoader />
-        )
-      ) : (
-        <>
-          <div className="tabs">
-            {TABS.map((t) => (
-              <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <>
+            <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+              <TabsList>
+                {TABS.map((t) => (
+                  <TabsTrigger key={t.id} value={t.id}>
+                    {t.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
 
-          {tab === 'files' && (
-            <div
-              className={`dropzone ${drag ? 'drag' : ''}`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDrag(true);
-              }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDrag(false);
-                addFiles(e.dataTransfer.files);
-              }}
-              onClick={() => fileInput.current?.click()}
-            >
-              <input ref={fileInput} type="file" multiple accept={ACCEPT} hidden onChange={(e) => addFiles(e.target.files)} />
-              <p>
-                <strong>Drop files here</strong> or click to browse
-              </p>
-              <p className="muted small">PDFs, lecture slides saved as PDF, photos of notes, text and Markdown files, subtitles (.srt/.vtt)</p>
-              {files.length > 0 && (
-                <ul className="file-list" onClick={(e) => e.stopPropagation()}>
-                  {files.map((f, i) => (
-                    <li key={i}>
-                      {f.name} <span className="muted small">({Math.ceil(f.size / 1024)} KB)</span>
-                      <button className="link" onClick={() => setFiles(files.filter((_, j) => j !== i))}>
-                        remove
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          {tab === 'text' && <textarea className="input" rows={10} placeholder="Paste lecture notes, a textbook passage, a transcript…" value={text} onChange={(e) => setText(e.target.value)} />}
-          {tab === 'url' && (
-            <>
-              <input className="input" placeholder="https://en.wikipedia.org/wiki/Krebs_cycle" value={url} onChange={(e) => setUrl(e.target.value)} />
-              <p className="muted small">Claude fetches the page and writes cards from its main content. Works best with articles and docs; paywalled pages will fail.</p>
-            </>
-          )}
-          {tab === 'topic' && (
-            <>
-              <input className="input" placeholder="e.g. Organic chemistry functional groups, Spanish past tense, AWS networking" value={topic} onChange={(e) => setTopic(e.target.value)} />
-              <p className="muted small">No material? Claude writes cards from its own knowledge.</p>
-            </>
-          )}
-          {tab === 'pairs' && (
-            <>
-              <textarea
-                className="input mono"
-                rows={10}
-                placeholder={'One card per line: term, then definition.\nPhotosynthesis\tConverting light to chemical energy\nmitochondria - powerhouse of the cell\nBonjour: Hello'}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-              <p className="muted small">Paste a Quizlet export, an Anki “Notes in plain text” export, or a CSV. Separators: tab, “ - ”, “:”, “;”, or comma. Imports instantly without AI.</p>
-              {!deckId && <input className="input" placeholder="Deck title" value={title} onChange={(e) => setTitle(e.target.value)} />}
-            </>
-          )}
-
-          {tab === 'mcq' && (
-            <div className="mcq-import">
-              <div className="mcq-step">
-                <div className="mcq-step-head">
-                  <span className="step-num">1</span>
-                  <div className="grow">
-                    <b>Copy the prompt into Claude or any AI chat</b>
-                    <p className="muted small">Then attach or paste your notes, slides or past exam. The AI decides how many cards it takes to cover everything, and mixes flashcards with multiple-choice questions (with code where it fits).</p>
-                  </div>
+              <TabsContent value="files">
+                <div
+                  className={cn(
+                    'cursor-pointer rounded-lg border-2 border-dashed border-input p-8 text-center transition-colors hover:border-primary hover:bg-accent',
+                    drag && 'border-primary bg-accent',
+                  )}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDrag(true);
+                  }}
+                  onDragLeave={() => setDrag(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDrag(false);
+                    addFiles(e.dataTransfer.files);
+                  }}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <input ref={fileInput} type="file" multiple accept={ACCEPT} hidden onChange={(e) => addFiles(e.target.files)} />
+                  <p>
+                    <strong>Drop files here</strong> or click to browse
+                  </p>
+                  <p className="text-sm text-muted-foreground">PDFs, lecture slides saved as PDF, photos of notes, text and Markdown files, subtitles (.srt/.vtt)</p>
+                  {files.length > 0 && (
+                    <ul className="mt-3 text-left text-sm" onClick={(e) => e.stopPropagation()}>
+                      {files.map((f, i) => (
+                        <li key={i} className="flex items-center gap-2 py-1">
+                          {f.name} <span className="text-sm text-muted-foreground">({Math.ceil(f.size / 1024)} KB)</span>
+                          <Button variant="link" className="ml-auto" onClick={() => setFiles(files.filter((_, j) => j !== i))}>
+                            remove
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <div className="mcq-prompt-opts">
-                  <input className="input" placeholder="Topic (optional), e.g. Java inheritance, C++ move semantics" value={mcqTopic} onChange={(e) => setMcqTopic(e.target.value)} />
-                  <button className={`btn ${copied ? 'good' : 'primary'}`} onClick={() => void copyPrompt()}>
+              </TabsContent>
+              <TabsContent value="text">
+                <Textarea rows={10} placeholder="Paste lecture notes, a textbook passage, a transcript…" value={text} onChange={(e) => setText(e.target.value)} />
+              </TabsContent>
+              <TabsContent value="url">
+                <Input placeholder="https://en.wikipedia.org/wiki/Krebs_cycle" value={url} onChange={(e) => setUrl(e.target.value)} />
+                <p className="text-sm text-muted-foreground">Claude fetches the page and writes cards from its main content. Works best with articles and docs; paywalled pages will fail.</p>
+              </TabsContent>
+              <TabsContent value="topic">
+                <Input placeholder="e.g. Organic chemistry functional groups, Spanish past tense, AWS networking" value={topic} onChange={(e) => setTopic(e.target.value)} />
+                <p className="text-sm text-muted-foreground">No material? Claude writes cards from its own knowledge.</p>
+              </TabsContent>
+              <TabsContent value="pairs">
+                <Textarea
+                  className="font-mono text-sm"
+                  rows={10}
+                  placeholder={'One card per line: term, then definition.\nPhotosynthesis\tConverting light to chemical energy\nmitochondria - powerhouse of the cell\nBonjour: Hello'}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Paste a Quizlet export, an Anki “Notes in plain text” export, or a CSV. Separators: tab, “ - ”, “:”, “;”, or comma. Imports instantly without AI.
+                </p>
+                {deckTitle}
+              </TabsContent>
+
+              <TabsContent value="mcq" className="gap-4">
+                <Step n={1} title="Copy the prompt into Claude or any AI chat">
+                  Then attach or paste your notes, slides or past exam. The AI decides how many cards it takes to cover everything, and mixes flashcards with multiple-choice
+                  questions (with code and math where they fit).
+                </Step>
+                <div className="grid grid-cols-[1fr_auto] gap-2 max-[640px]:grid-cols-1">
+                  <Input placeholder="Topic (optional), e.g. Java inheritance, C++ move semantics" value={mcqTopic} onChange={(e) => setMcqTopic(e.target.value)} />
+                  <Button variant={copied ? 'success' : 'default'} onClick={() => void copyPrompt()}>
                     {copied ? '✅ Copied' : '📋 Copy prompt'}
-                  </button>
+                  </Button>
                 </div>
-                <details className="mcq-prompt-preview">
-                  <summary>See the prompt</summary>
-                  <pre>{prompt}</pre>
-                </details>
-              </div>
-              <div className="mcq-step">
-                <div className="mcq-step-head">
-                  <span className="step-num">2</span>
-                  <div className="grow">
-                    <b>Paste the AI’s reply here</b>
-                  </div>
-                </div>
-                <textarea
-                  className="input mono"
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="link" className="text-sm">
+                      See the prompt
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <pre className="mt-2 max-h-[220px] overflow-auto rounded-sm bg-muted p-3 font-mono text-xs whitespace-pre-wrap">{prompt}</pre>
+                  </CollapsibleContent>
+                </Collapsible>
+                <Step n={2} title="Paste the AI’s reply here" />
+                <Textarea
+                  className="font-mono text-sm"
                   rows={9}
                   placeholder={'## Where the Krebs cycle runs\nIn eukaryotic cells, where does the Krebs cycle take place?\nAnswer: The mitochondrial matrix\n\n## Calling a subclass method\nIn Java, what happens when you run this?\n```java\n...\n```\n- [x] Compilation error\n- [ ] Prints Woof, then Fetching'}
                   value={mcqText}
                   onChange={(e) => setMcqText(e.target.value)}
                 />
                 {parsed && (
-                  <div className="mcq-check">
+                  <div className="flex flex-col gap-1 text-sm">
                     {parsed.questions.length > 0 && (
-                      <div className="mcq-ok">
+                      <div className="font-semibold text-success-ink">
                         ✅ {parsed.questions.length} card{parsed.questions.length === 1 ? '' : 's'} ready
-                        <span className="muted">
+                        <span className="font-normal text-muted-foreground">
                           {' · '}
                           {plural(parsed.questions.filter((q) => q.flashcard).length, 'flashcard')} · {parsed.questions.filter((q) => !q.flashcard).length} multiple choice
                           {parsed.questions.some((q) => q.code) && ` · ${parsed.questions.filter((q) => q.code).length} with code`}
                         </span>
                       </div>
                     )}
-                    {parsed.questions.length === 0 && parsed.errors.length === 0 && <div className="mcq-bad">No cards found. Each card must start with a line like “## Title”.</div>}
+                    {parsed.questions.length === 0 && parsed.errors.length === 0 && <div className="text-destructive">No cards found. Each card must start with a line like “## Title”.</div>}
                     {parsed.errors.slice(0, 4).map((e) => (
-                      <div key={e.index} className="mcq-bad">
+                      <div key={e.index} className="text-destructive">
                         ⚠️ <b>{e.title}</b> {e.message}. It will be skipped.
                       </div>
                     ))}
-                    {parsed.errors.length > 4 && <div className="mcq-bad">…and {parsed.errors.length - 4} more that will be skipped.</div>}
+                    {parsed.errors.length > 4 && <div className="text-destructive">…and {parsed.errors.length - 4} more that will be skipped.</div>}
                   </div>
                 )}
+                {deckTitle}
+              </TabsContent>
+            </Tabs>
+
+            {tab !== 'pairs' && tab !== 'mcq' && (
+              <div className="grid grid-cols-[1.4fr_1fr] gap-3 max-[860px]:grid-cols-1">
+                <Field>
+                  <FieldLabel htmlFor="gen-focus" className="font-medium">
+                    Focus (optional)
+                  </FieldLabel>
+                  <Input id="gen-focus" placeholder="e.g. dates and key people" value={focus} onChange={(e) => setFocus(e.target.value)} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="gen-level" className="font-medium">
+                    Level
+                  </FieldLabel>
+                  <Select value={level} onValueChange={setLevel}>
+                    <SelectTrigger id="gen-level">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={AUTO}>Auto</SelectItem>
+                      {LEVELS.map((l) => (
+                        <SelectItem key={l} value={l}>
+                          {l}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
               </div>
-              {!deckId && <input className="input" placeholder="Deck title" value={title} onChange={(e) => setTitle(e.target.value)} />}
-            </div>
-          )}
-
-          {tab !== 'pairs' && tab !== 'mcq' && (
-            <div className="gen-options">
-              <label>
-                <span>Focus (optional)</span>
-                <input className="input" placeholder="e.g. dates and key people" value={focus} onChange={(e) => setFocus(e.target.value)} />
-              </label>
-              <label>
-                <span>Level</span>
-                <select className="input" value={level} onChange={(e) => setLevel(e.target.value)}>
-                  <option value="">Auto</option>
-                  <option>High school</option>
-                  <option>Undergraduate</option>
-                  <option>Graduate / professional</option>
-                  <option>Beginner language learner</option>
-                </select>
-              </label>
-            </div>
-          )}
-
-          <div className="modal-actions">
-            {!deckId && (
-              <>
-                <button className="btn ghost" onClick={() => setBlank(true)}>
-                  Start with an empty deck
-                </button>
-                <div className="grow" />
-              </>
             )}
-            <button className="btn ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button className="btn primary big" disabled={!ready} onClick={() => void submit()}>
-              {tab === 'pairs' ? 'Import cards' : tab === 'mcq' ? `Import ${parsed?.questions.length || ''} cards` : '✨ Generate cards'}
-            </button>
-          </div>
-        </>
-      )}
-    </Modal>
+
+            <DialogFooter>
+              {!deckId && (
+                <>
+                  <Button variant="ghost" onClick={() => setBlank(true)}>
+                    Start with an empty deck
+                  </Button>
+                  <div className="flex-1" />
+                </>
+              )}
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button variant="default" size="lg" disabled={!ready} onClick={() => void submit()}>
+                {tab === 'pairs' ? 'Import cards' : tab === 'mcq' ? `Import ${parsed?.questions.length || ''} cards` : '✨ Generate cards'}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Step({ n, title, children }: { n: number; title: string; children?: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="grid size-7 flex-none place-items-center rounded-full bg-primary font-display font-bold text-primary-foreground">{n}</span>
+      <div className="flex-1">
+        <b>{title}</b>
+        {children && <FieldDescription className="mt-0.5">{children}</FieldDescription>}
+      </div>
+    </div>
   );
 }

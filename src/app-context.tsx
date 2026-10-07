@@ -1,7 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ACHIEVEMENTS, SHOP } from '../shared/game.ts';
 import { ApiError, api, type AppState } from './api.ts';
-import { Icon } from './components/icons.tsx';
+import { toast as sonner } from 'sonner';
+import { BrandMark } from './components/BrandMark.tsx';
+import { ConfirmDialog, type ConfirmRequest } from './components/ConfirmDialog.tsx';
+import { Button } from '@/components/ui/button';
+import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { patternImage } from './theme-patterns.ts';
 import { setSoundEnabled, setSoundVolume, sfx } from './sound.ts';
 
@@ -43,6 +49,8 @@ interface Ctx {
   toast: (t: Omit<Toast, 'id'>) => void;
   showError: (e: unknown) => void;
   announceAchievements: (ids: string[]) => void;
+  /** Ask before something that cannot be undone. Resolves to the chosen action's value, or null when cancelled. */
+  ask: (req: Omit<ConfirmRequest, 'resolve'>) => Promise<string | null>;
 }
 
 const AppContext = createContext<Ctx | null>(null);
@@ -86,7 +94,7 @@ function applyTheme(themeId: string) {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [asking, setAsking] = useState<ConfirmRequest | null>(null);
   const nextId = useRef(1);
 
   const refresh = useCallback(async () => {
@@ -108,9 +116,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toast = useCallback((t: Omit<Toast, 'id'>) => {
     const id = nextId.current++;
-    setToasts((ts) => [...ts, { ...t, id }]);
-    setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), t.kind === 'error' ? 7000 : 4200);
+    sonner.custom(() => <ToastCard toast={{ ...t, id }} />, { id, duration: t.kind === 'error' ? 7000 : 4200 });
   }, []);
+
+  const ask = useCallback((req: Omit<ConfirmRequest, 'resolve'>) => new Promise<string | null>((resolve) => setAsking({ ...req, resolve })), []);
 
   const showError = useCallback(
     (e: unknown) => {
@@ -147,27 +156,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [toast],
   );
 
-  const value = useMemo(() => ({ state, refresh, toast, showError, announceAchievements }), [state, refresh, toast, showError, announceAchievements]);
+  const value = useMemo(() => ({ state, refresh, toast, showError, announceAchievements, ask }), [state, refresh, toast, showError, announceAchievements, ask]);
 
   if (!state) {
     return (
-      <div className="boot">
-        <span className="brand-mark boot-logo">
-          <Icon name="bolt" size={14} filled />
-        </span>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-2 p-6 text-center">
+        <BrandMark className="mb-2" />
         {loadError ? (
           <>
             <p>Could not reach the Flick server.</p>
-            <p className="muted small">{loadError}</p>
-            <p className="muted small">
-              Start it with <code>npm run dev</code> (or <code>npm start</code>) and reload.
+            <p className="text-sm text-muted-foreground">{loadError}</p>
+            <p className="text-sm text-muted-foreground">
+              Start it with <code className="font-mono">npm run dev</code> (or <code className="font-mono">npm start</code>) and reload.
             </p>
-            <button className="btn" onClick={() => void refresh()}>
-              Retry
-            </button>
+            <Button onClick={() => void refresh()}>Retry</Button>
           </>
         ) : (
-          <p className="muted">Loading…</p>
+          <p className="text-muted-foreground">Loading…</p>
         )}
       </div>
     );
@@ -175,18 +180,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={value}>
-      {children}
-      <div className="toasts" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.kind ?? 'info'}`}>
-            {t.icon && <span className="toast-icon">{t.icon}</span>}
-            <div>
-              <div className="toast-title">{t.title}</div>
-              {t.body && <div className="toast-body">{t.body}</div>}
-            </div>
-          </div>
-        ))}
-      </div>
+      <TooltipProvider>
+        {children}
+        <Toaster />
+        {asking && (
+          <ConfirmDialog
+            request={asking}
+            onDone={(v) => {
+              asking.resolve(v);
+              setAsking(null);
+            }}
+          />
+        )}
+      </TooltipProvider>
     </AppContext.Provider>
+  );
+}
+
+const TOAST_KIND: Record<NonNullable<Toast['kind']>, string> = {
+  info: 'border-border bg-card',
+  error: 'border-destructive bg-card',
+  success: 'border-success bg-card',
+  achievement: 'border-warning bg-warning-soft',
+};
+
+function ToastCard({ toast: t }: { toast: Toast }) {
+  return (
+    <div
+      role={t.kind === 'error' ? 'alert' : 'status'}
+      className={cn('flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 rounded-md border-2 px-4 py-3 text-sm text-foreground shadow-overlay', TOAST_KIND[t.kind ?? 'info'])}
+    >
+      {t.icon && <span className="text-[26px] leading-none">{t.icon}</span>}
+      <div className="min-w-0">
+        <div className="font-display text-base font-semibold">{t.title}</div>
+        {t.body && <div className="text-xs text-muted-foreground">{t.body}</div>}
+      </div>
+    </div>
   );
 }

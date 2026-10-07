@@ -84,8 +84,12 @@ Write for a smart student who is new to the subject. Use plain English, short se
 - Multiple-choice hint: one sentence that points at the mechanism without giving away the answer.
 - Multiple-choice explanation: first explain the mechanism that produces the correct answer, in 2 to 4 sentences. Then add one short line per wrong option that quotes the option and names the wrong belief that leads to it.`;
 
+/** Flick renders every field as Markdown with KaTeX, so math must be LaTeX between dollar signs. */
+export const MATH_GUIDE = `## Math and formatting
+Flick shows every question, option, hint and explanation as Markdown. Write math in LaTeX between dollar signs: $x^2 + 1$ inline, and $$\\int_0^1 x\\,dx = \\tfrac{1}{2}$$ on its own line for a display equation. Use LaTeX for every formula and variable, not Unicode symbols or plain text such as "x^2". Write a literal dollar sign, such as a price, as \\$5. Put code in \`backticks\`, never inside dollar signs.`;
+
 /** Every writing rule, in the order a writer needs them. */
-export const WRITING_GUIDE = [COVERAGE_GUIDE, TYPE_GUIDE, FLASHCARD_GUIDE, MCQ_GUIDE, EXPLANATION_GUIDE].join('\n\n');
+export const WRITING_GUIDE = [COVERAGE_GUIDE, TYPE_GUIDE, FLASHCARD_GUIDE, MCQ_GUIDE, EXPLANATION_GUIDE, MATH_GUIDE].join('\n\n');
 
 const FORMAT = `## Output format (strict)
 Output only the cards, as plain Markdown. Do not put the whole answer inside a code block, and do not add any text before or after the cards.

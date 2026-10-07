@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { Reward } from '../../shared/types.ts';
 import { api, type CardView } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
-import { EmptyState, Spinner } from '../components/ui.tsx';
+import { Markdown } from '../components/Markdown.tsx';
+import { EmptyState, Spinner } from '../components/shared.tsx';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
-import { PlayHeader, Results, useSession } from './common.tsx';
+import { PlayHeader, PlayShell, Results, useSession } from './common.tsx';
 import { type Scope, scopeBackLabel, scopeHome } from '../scope.ts';
 
 interface Tile {
@@ -113,29 +116,28 @@ function MatchRun({ scope, onRestart }: { scope: Scope; onRestart: () => void })
 
   if (!cards) {
     return (
-      <div className="play center">
-        <Spinner />
-      </div>
+      <PlayShell center>
+        <Spinner className="size-6" />
+      </PlayShell>
     );
   }
 
   if (cards.length < 2) {
     return (
-      <div className="play center">
-        <EmptyState mood="sleepy" title="Not enough pairs to match">
-          <p className="muted">Match uses short question-and-answer cards. Code and multiple-choice questions sit this game out.</p>
-          <button className="btn primary" onClick={() => navigate(scopeHome(scope))}>
+      <PlayShell center>
+        <EmptyState mood="sleepy" title="Not enough pairs to match" description="Match uses short question-and-answer cards. Code and multiple-choice questions sit this game out.">
+          <Button variant="default" onClick={() => navigate(scopeHome(scope))}>
             {scopeBackLabel(scope)}
-          </button>
+          </Button>
         </EmptyState>
-      </div>
+      </PlayShell>
     );
   }
 
   if (finalMs !== null && reward) {
     const best = s.profile.stats.matchBestMs;
     return (
-      <div className="play">
+      <PlayShell>
         <Results
           reward={reward}
           title={`🧩 Cleared in ${fmt(finalMs)}!`}
@@ -148,32 +150,40 @@ function MatchRun({ scope, onRestart }: { scope: Scope; onRestart: () => void })
           ]}
           onAgain={onRestart}
         />
-      </div>
+      </PlayShell>
     );
   }
 
   return (
-    <div className="play wide">
+    <PlayShell wide>
       <PlayHeader onQuit={() => navigate(scopeHome(scope))}>
-        <div className="grow">
-          <b>Match</b> <span className="muted small">Tap a question, then its answer. Wrong pairs add {PENALTY_MS / 1000}s.</span>
+        <div className="flex-1">
+          <b className="font-display">Match</b> <span className="text-sm text-muted-foreground">Tap a question, then its answer. Wrong pairs add {PENALTY_MS / 1000}s.</span>
         </div>
-        <span className="timer">{fmt(elapsed)}</span>
+        <span className="min-w-[70px] text-right font-display text-xl font-bold tabular-nums">{fmt(elapsed)}</span>
       </PlayHeader>
-      <div className="match-grid" ref={boardRef}>
-        {tiles.map((t) => (
-          <button
-            key={t.key}
-            className={`match-tile ${t.side} ${selected?.key === t.key ? 'selected' : ''} ${cleared.has(t.key) ? 'cleared' : ''} ${
-              wrongPair.includes(t.key) ? 'wrong' : ''
-            }`}
-            onClick={(e) => click(t, e.currentTarget)}
-            disabled={cleared.has(t.key)}
-          >
-            {t.text}
-          </button>
-        ))}
+      <div className="mt-4 grid grid-cols-4 gap-2 max-[860px]:grid-cols-3 max-[560px]:grid-cols-2" ref={boardRef}>
+        {tiles.map((t) => {
+          const isCleared = cleared.has(t.key);
+          return (
+            <button
+              key={t.key}
+              data-quiet
+              className={cn(
+                'min-h-[100px] rounded-lg border-2 border-border bg-card p-3 text-sm font-medium text-foreground shadow-ledge transition-[opacity,transform,border-color,background-color] duration-250 ease-bounce hover:not-disabled:-translate-y-0.5 hover:not-disabled:border-primary',
+                t.side === 'front' && 'font-display text-md font-semibold',
+                selected?.key === t.key && 'border-primary bg-accent',
+                wrongPair.includes(t.key) && 'border-destructive bg-[color-mix(in_srgb,var(--bad)_12%,var(--surface))]',
+                isCleared && 'pointer-events-none scale-85 opacity-0',
+              )}
+              onClick={(e) => click(t, e.currentTarget)}
+              disabled={isCleared}
+            >
+              <Markdown inline text={t.text} />
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </PlayShell>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { AppProvider, navigate, useApp, useRoute } from './app-context.tsx';
-import { TopBar } from './components/ui.tsx';
+import { TopBar } from './components/shared.tsx';
 import { folderScope } from './scope.ts';
 import { sfx } from './sound.ts';
 import { Achievements } from './pages/Achievements.tsx';
@@ -17,29 +17,22 @@ import { Match } from './play/Match.tsx';
 import { Quiz } from './play/Quiz.tsx';
 import { TimeAttack } from './play/TimeAttack.tsx';
 
-// Controls that play their own sound (answers, ratings, tiles) are left out.
-const QUIET = '.option, .rate-btn, .match-tile, .flip-card, .mascot-btn, [data-quiet]';
+// Controls that play their own sound (answers, ratings, tiles, Flicky) carry data-quiet.
+const QUIET = '[data-quiet]';
 
-/** One listener gives every button, link and switch a soft sound. */
+/** One listener gives every button, link, tab and switch a soft sound. */
 function useUiSounds() {
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      const el = (e.target as HTMLElement).closest<HTMLElement>('button, a[href], [role="button"]');
-      if (!el || el.closest(QUIET) || (el as HTMLButtonElement).disabled) return;
-      if (el.closest('.nav')) sfx.nav();
+      const el = (e.target as HTMLElement).closest<HTMLElement>('button, a[href], [role="button"], [role="option"], [role="menuitem"], [role="tab"]');
+      if (!el || el.closest(QUIET) || (el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true') return;
+      if (el.closest('[data-nav]')) sfx.nav();
+      // Switches announce their new state: the click fires before Radix flips aria-checked.
+      else if (el.getAttribute('role') === 'switch') sfx.toggle(el.getAttribute('aria-checked') !== 'true');
       else sfx.tap();
     };
-    const onChange = (e: Event) => {
-      const el = e.target as HTMLInputElement;
-      if (el.type === 'checkbox') sfx.toggle(el.checked);
-      else if (el.tagName === 'SELECT') sfx.tap();
-    };
     document.addEventListener('click', onClick);
-    document.addEventListener('change', onChange);
-    return () => {
-      document.removeEventListener('click', onClick);
-      document.removeEventListener('change', onChange);
-    };
+    return () => document.removeEventListener('click', onClick);
   }, []);
 }
 
@@ -82,8 +75,8 @@ function Routes() {
   return (
     <>
       <TopBar />
-      <main>
-        <div key={parts.slice(0, 2).join('/')} className="route">
+      <main className="px-6 pb-12 max-[560px]:px-4">
+        <div key={parts.slice(0, 2).join('/')} className="route-in">
           {page}
         </div>
       </main>

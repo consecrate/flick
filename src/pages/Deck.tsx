@@ -2,17 +2,32 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MAX_OPTIONS } from '../../shared/mcq.ts';
 import { api, type CardView, type DeckDetail } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
-import { Inline } from '../components/Code.tsx';
+import { EditableTitle, EmojiPicker, ModeButton, ModeGrid, StatLine } from '../components/DeckHero.tsx';
 import { FolderCrumbs, MoveModal, deckItem } from '../components/DeckBrowser.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
 import { ImportModal } from '../components/ImportModal.tsx';
-import { Icon } from '../components/icons.tsx';
-import { ClaudeLoader, EmptyState, MasteryBar, Modal, Spinner, TierChip } from '../components/ui.tsx';
+import { Markdown } from '../components/Markdown.tsx';
+import { ClaudeLoader, EmptyState, MasteryBar, Page, PageSpinner, TierChip } from '../components/shared.tsx';
+import { CodeBlock } from '../components/Code.tsx';
+import { EllipsisIcon, MessageCircleIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Tip } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const EMOJIS = ['📘', '🧬', '🧪', '🧮', '🌍', '🏛️', '💻', '🎨', '🎵', '⚖️', '🩺', '📈', '🗣️', '🔭', '🧠', '📜'];
 
 export function DeckPage({ id }: { id: string }) {
-  const { showError, refresh, toast } = useApp();
+  const { showError, refresh, toast, ask } = useApp();
   const [data, setData] = useState<DeckDetail | null>(null);
   const [tab, setTab] = useState<'cards' | 'materials'>('cards');
   const [importing, setImporting] = useState(false);
@@ -20,7 +35,6 @@ export function DeckPage({ id }: { id: string }) {
   const [explaining, setExplaining] = useState<CardView | null>(null);
   const [query, setQuery] = useState('');
   const [enhancing, setEnhancing] = useState(false);
-  const [editTitle, setEditTitle] = useState(false);
   const [moving, setMoving] = useState(false);
   const s = useAppState();
 
@@ -49,13 +63,7 @@ export function DeckPage({ id }: { id: string }) {
     return q ? list.filter((c) => [c.title, c.front, c.back, c.code].some((x) => x?.toLowerCase().includes(q))) : list;
   }, [data, query]);
 
-  if (!data) {
-    return (
-      <div className="page center">
-        <Spinner />
-      </div>
-    );
-  }
+  if (!data) return <PageSpinner />;
   const d = data.deck;
   const missingOptions = data.cards.filter((c) => !c.mcq && c.distractors.length < 3).length;
 
@@ -84,7 +92,7 @@ export function DeckPage({ id }: { id: string }) {
 
   const remove = async () => {
     const what = d.cardCount ? `“${d.title}” and all ${d.cardCount} cards` : `“${d.title}”`;
-    if (!confirm(`Delete ${what}? This cannot be undone.`)) return;
+    if (!(await ask({ title: `Delete ${what}?`, description: 'This cannot be undone.', actions: [{ label: 'Delete deck', value: 'ok', destructive: true }] }))) return;
     try {
       await api.deleteDeck(d.id);
       await refresh();
@@ -100,7 +108,7 @@ export function DeckPage({ id }: { id: string }) {
       if (action === 'suspend') await api.updateCard(c.id, { suspended: !c.suspended });
       if (action === 'reset') await api.resetCard(c.id);
       if (action === 'delete') {
-        if (!confirm('Delete this card?')) return;
+        if (!(await ask({ title: 'Delete this card?', description: 'Its review history goes with it.', actions: [{ label: 'Delete card', value: 'ok', destructive: true }] }))) return;
         await api.deleteCard(c.id);
       }
       await load();
@@ -110,245 +118,232 @@ export function DeckPage({ id }: { id: string }) {
     }
   };
 
+  const removeMaterial = async (m: DeckDetail['materials'][number]) => {
+    const choice = await ask({
+      title: `Remove “${m.title}”?`,
+      description: m.cardCount ? `It made ${m.cardCount} card${m.cardCount === 1 ? '' : 's'}. You can keep them or delete them too.` : undefined,
+      actions: m.cardCount
+        ? [
+            { label: 'Keep the cards', value: 'keep' },
+            { label: 'Delete the cards too', value: 'cards', destructive: true },
+          ]
+        : [{ label: 'Remove', value: 'keep', destructive: true }],
+    });
+    if (!choice) return;
+    try {
+      await api.deleteMaterial(m.id, choice === 'cards');
+      await load();
+      void refresh();
+    } catch (e) {
+      showError(e);
+    }
+  };
+
   const enough = d.cardCount > 0;
+  const row = 'flex items-center gap-4 border-t-2 border-border px-6 py-3 first:border-t-0 max-[560px]:flex-wrap max-[560px]:px-4';
 
   return (
-    <div className="page">
-      <div className="page-top">
+    <Page>
+      <div className="-mb-4 flex items-center justify-between gap-3">
         <FolderCrumbs folderId={s.folders.some((f) => f.id === d.folderId) ? d.folderId! : null} />
-        <button className="btn small ghost" onClick={() => setMoving(true)}>
+        <Button size="sm" variant="ghost" onClick={() => setMoving(true)}>
           📁 Move to folder
-        </button>
+        </Button>
       </div>
-      <section className="deck-hero">
-        <div className="deck-hero-main">
-          <details className="emoji-picker">
-            <summary className="deck-hero-emoji">{d.emoji}</summary>
-            <div className="emoji-grid">
-              {EMOJIS.map((e) => (
-                <button key={e} onClick={() => void update({ emoji: e })}>
-                  {e}
-                </button>
-              ))}
-            </div>
-          </details>
-          <div className="grow">
-            {editTitle ? (
-              <input
-                className="input title-input"
-                autoFocus
-                defaultValue={d.title}
-                onBlur={(e) => {
-                  setEditTitle(false);
-                  if (e.target.value.trim() && e.target.value !== d.title) void update({ title: e.target.value });
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-              />
-            ) : (
-              <h1 onClick={() => setEditTitle(true)} title="Click to rename" className="editable">
-                {d.title}
-              </h1>
-            )}
-            {d.description && <p className="muted">{d.description}</p>}
-            <div className="deck-stats">
-              <span>
-                <b>{d.cardCount}</b> cards
-              </span>
-              <span>
-                <b className="due-text">{d.dueCount}</b> due
-              </span>
-              <span>
-                <b className="new-text">{d.newCount}</b> new
-              </span>
-              <span>
-                <b>{Math.round(d.mastery * 100)}%</b> mastered
-              </span>
-            </div>
-            <MasteryBar tiers={tiers} height={6} />
+      <section className="flex flex-col gap-6">
+        <div className="flex items-start gap-4">
+          <EmojiPicker value={d.emoji} choices={EMOJIS} onPick={(emoji) => void update({ emoji })} />
+          <div className="min-w-0 flex-1">
+            <EditableTitle value={d.title} onRename={(title) => void update({ title })} />
+            {d.description && <p className="mt-1 text-muted-foreground">{d.description}</p>}
+            <StatLine
+              items={[
+                { value: d.cardCount, label: 'cards' },
+                { value: d.dueCount, label: 'due', tone: 'due' },
+                { value: d.newCount, label: 'new' },
+                { value: `${Math.round(d.mastery * 100)}%`, label: 'mastered' },
+              ]}
+            />
+            <MasteryBar tiers={tiers} className="h-1.5" />
           </div>
         </div>
 
-        <div className="modes">
-          <button className="mode-btn primary" disabled={!enough} onClick={() => navigate(`/play/quiz/${d.id}`)}>
-            <span className="mode-icon">🎯</span>
-            <span className="mode-name">Quiz</span>
-            <span className="mode-desc">{!enough ? 'Add cards first' : d.dueCount + d.newCount > 0 ? `${d.dueCount} due · ${d.newCount} new` : 'Practice ahead'}</span>
-          </button>
-          <button className="mode-btn" disabled={!enough} onClick={() => navigate(`/play/flashcards/${d.id}`)}>
-            <span className="mode-icon">🃏</span>
-            <span className="mode-name">Flashcards</span>
-            <span className="mode-desc">Flip & self-rate</span>
-          </button>
-          <button className="mode-btn" disabled={d.cardCount < 3} onClick={() => navigate(`/play/match/${d.id}`)}>
-            <span className="mode-icon">🧩</span>
-            <span className="mode-name">Match</span>
-            <span className="mode-desc">Beat the clock</span>
-          </button>
-          <button className="mode-btn" disabled={d.cardCount < 4} onClick={() => navigate(`/play/timeattack/${d.id}`)}>
-            <span className="mode-icon">⏱️</span>
-            <span className="mode-name">Time Attack</span>
-            <span className="mode-desc">60-second blitz</span>
-          </button>
-          <button className="mode-btn boss" disabled={!d.bossReady} onClick={() => navigate(`/play/boss/${d.id}`)}>
-            <span className="mode-icon">⚔️</span>
-            <span className="mode-name">Boss Fight</span>
-            <span className="mode-desc">
-              {d.bossReady ? (
-                'Your hardest cards'
-              ) : (
-                <>
-                  <Icon name="lock" size={12} /> Study {data.bossMinCards}+ cards
-                </>
-              )}
-            </span>
-          </button>
-        </div>
+        <ModeGrid>
+          <ModeButton
+            primary
+            icon="🎯"
+            name="Quiz"
+            desc={!enough ? 'Add cards first' : d.dueCount + d.newCount > 0 ? `${d.dueCount} due · ${d.newCount} new` : 'Practice ahead'}
+            disabled={!enough}
+            onClick={() => navigate(`/play/quiz/${d.id}`)}
+          />
+          <ModeButton icon="🃏" name="Flashcards" desc="Flip & self-rate" disabled={!enough} onClick={() => navigate(`/play/flashcards/${d.id}`)} />
+          <ModeButton icon="🧩" name="Match" desc="Beat the clock" disabled={d.cardCount < 3} onClick={() => navigate(`/play/match/${d.id}`)} />
+          <ModeButton icon="⏱️" name="Time Attack" desc="60-second blitz" disabled={d.cardCount < 4} onClick={() => navigate(`/play/timeattack/${d.id}`)} />
+          <ModeButton
+            icon="⚔️"
+            name="Boss Fight"
+            desc={d.bossReady ? 'Your hardest cards' : `Study ${data.bossMinCards}+ cards`}
+            locked={!d.bossReady}
+            disabled={!d.bossReady}
+            onClick={() => navigate(`/play/boss/${d.id}`)}
+          />
+        </ModeGrid>
       </section>
 
-      <div className="tabs">
-        <button className={`tab ${tab === 'cards' ? 'active' : ''}`} onClick={() => setTab('cards')}>
-          🃏 Cards <span className="num">{data.cards.length}</span>
-        </button>
-        <button className={`tab ${tab === 'materials' ? 'active' : ''}`} onClick={() => setTab('materials')}>
-          📚 Materials <span className="num">{data.materials.length}</span>
-        </button>
-        <div className="grow" />
-        <button className="btn ghost" onClick={() => setEditing('new')}>
-          <Icon name="plus" /> Card
-        </button>
-        <button className="btn" onClick={() => setImporting(true)}>
-          <Icon name="plus" /> Add material
-        </button>
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+        <div className="flex flex-wrap items-center gap-2">
+          <TabsList>
+            <TabsTrigger value="cards">
+              🃏 Cards <span className="num text-muted-foreground">{data.cards.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="materials">
+              📚 Materials <span className="num text-muted-foreground">{data.materials.length}</span>
+            </TabsTrigger>
+          </TabsList>
+          <div className="flex-1" />
+          <Button variant="ghost" onClick={() => setEditing('new')}>
+            <PlusIcon /> Card
+          </Button>
+          <Button onClick={() => setImporting(true)}>
+            <PlusIcon /> Add material
+          </Button>
+        </div>
 
-      {tab === 'cards' && (
-        <>
+        <TabsContent value="cards">
           {missingOptions > 0 && (
-            <div className="notice">
+            <Alert variant="brand" className="justify-between">
               {enhancing ? (
                 <ClaudeLoader lines={['Claude is writing multiple-choice options…', 'Making the wrong answers tempting…']} />
               ) : (
                 <>
-                  <span>
+                  <AlertDescription>
                     {missingOptions} card{missingOptions === 1 ? '' : 's'} have no multiple-choice options yet.
-                  </span>
-                  <button className="btn small primary" onClick={() => void enhance()}>
+                  </AlertDescription>
+                  <Button size="sm" variant="default" onClick={() => void enhance()}>
                     🧠 Write quiz options with Claude
-                  </button>
+                  </Button>
                 </>
               )}
+            </Alert>
+          )}
+          {data.cards.length > 6 && (
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-10" placeholder="Search cards…" value={query} onChange={(e) => setQuery(e.target.value)} />
             </div>
           )}
-          {data.cards.length > 6 && <input className="input search" placeholder="Search cards…" value={query} onChange={(e) => setQuery(e.target.value)} />}
           {data.cards.length === 0 ? (
-            <EmptyState mood="wow" title="No cards yet">
-              <p className="muted">Write cards yourself, or add notes, a PDF, a link or a topic and Claude writes them.</p>
-              <div className="row center-row">
-                <button className="btn" onClick={() => setEditing('new')}>
-                  <Icon name="plus" /> Write a card
-                </button>
-                <button className="btn primary" onClick={() => setImporting(true)}>
-                  ✨ Add material
-                </button>
-              </div>
+            <EmptyState mood="wow" title="No cards yet" description="Write cards yourself, or add notes, a PDF, a link or a topic and Claude writes them.">
+              <Button onClick={() => setEditing('new')}>
+                <PlusIcon /> Write a card
+              </Button>
+              <Button variant="default" onClick={() => setImporting(true)}>
+                ✨ Add material
+              </Button>
             </EmptyState>
           ) : (
-            <div className="card-list">
-              {filtered.map((c) => (
-                <div key={c.id} className={`card-row ${c.suspended ? 'suspended' : ''}`}>
-                  <div className="card-row-main" onClick={() => setEditing(c)}>
-                    <div className="card-front">
-                      {c.mcq && <span className="chip">🎯 {c.distractors.length + 1} options</span>}
-                      {c.code && <span className="chip">{'</>'} {c.codeLang ?? 'code'}</span>}
-                      <span>
-                        {c.title ? `${c.title}: ` : ''}
-                        {c.front}
-                      </span>
-                    </div>
-                    <div className="card-back">
-                      <Inline text={c.back} />
-                    </div>
-                  </div>
-                  <div className="card-row-meta">
-                    <TierChip tier={c.tier} />
-                    {c.srs.state !== 0 && <span className="muted small" title="Predicted chance you remember it right now">{Math.round(c.recall * 100)}% recall</span>}
-                    {c.suspended && <span className="muted small">paused</span>}
-                  </div>
-                  <div className="card-row-actions">
-                    <button className="icon-btn" title="Ask Claude about this card" onClick={() => setExplaining(c)}>
-                      <Icon name="chat" />
-                    </button>
-                    <button className={`icon-btn ${c.starred ? 'on' : ''}`} title={c.starred ? 'Unstar' : 'Star'} onClick={() => void cardAction(c, 'star')}>
-                      <Icon name="star" filled={c.starred} />
-                    </button>
-                    <details className="menu">
-                      <summary className="icon-btn" title="More">
-                        <Icon name="more" />
-                      </summary>
-                      <div className="menu-items">
-                        <button onClick={() => setEditing(c)}>Edit</button>
-                        <button onClick={() => void cardAction(c, 'suspend')}>{c.suspended ? 'Resume' : 'Pause'}</button>
-                        <button onClick={() => void cardAction(c, 'reset')}>Reset progress</button>
-                        <button className="danger" onClick={() => void cardAction(c, 'delete')}>
-                          Delete
-                        </button>
+            filtered.length > 0 && (
+              <div className="flex flex-col rounded-lg border-2 border-border bg-card shadow-ledge">
+                {filtered.map((c) => (
+                  <div key={c.id} className={cn(row, c.suspended && 'opacity-50')}>
+                    <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setEditing(c)}>
+                      <div className="flex items-center gap-2 font-semibold">
+                        {c.mcq && <Badge>🎯 {c.distractors.length + 1} options</Badge>}
+                        {c.code && <Badge>{'</>'} {c.codeLang ?? 'code'}</Badge>}
+                        <span className="line-clamp-2 min-w-0">
+                          {c.title ? `${c.title}: ` : ''}
+                          <Markdown inline text={c.front} />
+                        </span>
                       </div>
-                    </details>
+                      <div className="line-clamp-2 text-sm text-muted-foreground">
+                        <Markdown inline text={c.back} />
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5 whitespace-nowrap">
+                      <TierChip tier={c.tier} />
+                      {c.srs.state !== 0 && (
+                        <span className="text-xs text-muted-foreground" title="Predicted chance you remember it right now">
+                          {Math.round(c.recall * 100)}% recall
+                        </span>
+                      )}
+                      {c.suspended && <span className="text-xs text-muted-foreground">paused</span>}
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <Tip label="Ask Claude about this card">
+                        <Button variant="plain" size="icon" aria-label="Ask Claude about this card" onClick={() => setExplaining(c)}>
+                          <MessageCircleIcon />
+                        </Button>
+                      </Tip>
+                      <Tip label={c.starred ? 'Unstar' : 'Star'}>
+                        <Button
+                          variant="plain"
+                          size="icon"
+                          aria-label={c.starred ? 'Unstar' : 'Star'}
+                          className={cn(c.starred && 'text-warning hover:not-disabled:text-warning')}
+                          onClick={() => void cardAction(c, 'star')}
+                        >
+                          <StarIcon fill={c.starred ? 'currentColor' : 'none'} />
+                        </Button>
+                      </Tip>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="plain" size="icon" aria-label="More">
+                            <EllipsisIcon />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setEditing(c)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => void cardAction(c, 'suspend')}>{c.suspended ? 'Resume' : 'Pause'}</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => void cardAction(c, 'reset')}>Reset progress</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem variant="destructive" onSelect={() => void cardAction(c, 'delete')}>
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
+                ))}
+              </div>
+            )
+          )}
+        </TabsContent>
+
+        <TabsContent value="materials">
+          {data.materials.length === 0 ? (
+            <EmptyState mood="sleepy" title="No materials yet" description="Add PDFs, notes, links or topics. Each one adds new cards to this deck." />
+          ) : (
+            <div className="flex flex-col rounded-lg border-2 border-border bg-card shadow-ledge">
+              {data.materials.map((m) => (
+                <div key={m.id} className={row}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <Badge>{{ text: '📝 Notes', file: '📄 File', url: '🔗 Link', topic: '💭 Topic', import: '📥 List', mcq: '📋 Pasted' }[m.kind]}</Badge>
+                      {m.title}
+                    </div>
+                    <div className="line-clamp-2 text-sm text-muted-foreground">{m.preview}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5 text-xs whitespace-nowrap text-muted-foreground">
+                    <span>{m.cardCount} cards</span>
+                    <span>{new Date(m.addedAt).toLocaleDateString()}</span>
+                  </div>
+                  <Tip label="Remove material">
+                    <Button variant="plain" size="icon" aria-label="Remove material" onClick={() => void removeMaterial(m)}>
+                      <Trash2Icon />
+                    </Button>
+                  </Tip>
                 </div>
               ))}
             </div>
           )}
-        </>
-      )}
+        </TabsContent>
+      </Tabs>
 
-      {tab === 'materials' && (
-        <div className="card-list">
-          {data.materials.length === 0 && (
-            <EmptyState mood="sleepy" title="No materials yet">
-              <p className="muted">Add PDFs, notes, links or topics. Each one adds new cards to this deck.</p>
-            </EmptyState>
-          )}
-          {data.materials.map((m) => (
-            <div key={m.id} className="card-row">
-              <div className="card-row-main">
-                <div className="card-front">
-                  <span className="chip">{{ text: '📝 Notes', file: '📄 File', url: '🔗 Link', topic: '💭 Topic', import: '📥 List', mcq: '📋 Pasted' }[m.kind]}</span>
-                  {m.title}
-                </div>
-                <div className="card-back muted">{m.preview}</div>
-              </div>
-              <div className="card-row-meta">
-                <span className="muted small">{m.cardCount} cards</span>
-                <span className="muted small">{new Date(m.addedAt).toLocaleDateString()}</span>
-              </div>
-              <div className="card-row-actions">
-                <button
-                  className="icon-btn"
-                  title="Remove material"
-                  onClick={async () => {
-                    const withCards = confirm(`Also delete the ${m.cardCount} cards made from “${m.title}”?\nOK = delete cards too, Cancel = keep cards.`);
-                    try {
-                      await api.deleteMaterial(m.id, withCards);
-                      await load();
-                      void refresh();
-                    } catch (e) {
-                      showError(e);
-                    }
-                  }}
-                >
-                  <Icon name="trash" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="danger-zone">
-        <button className="link danger" onClick={() => void remove()}>
+      <div className="text-center text-sm">
+        <Button variant="link" className="text-destructive" onClick={() => void remove()}>
           Delete deck
-        </button>
+        </Button>
       </div>
 
       {importing && (
@@ -375,7 +370,7 @@ export function DeckPage({ id }: { id: string }) {
       )}
       {explaining && <ExplainModal card={explaining} onClose={() => setExplaining(null)} />}
       {moving && <MoveModal item={deckItem(d, s.folders)} onClose={() => setMoving(false)} onMoved={() => void load()} />}
-    </div>
+    </Page>
   );
 }
 
@@ -396,6 +391,7 @@ function CardEditor({ deckId, card, onClose, onSaved }: { deckId: string; card: 
   const [hint, setHint] = useState(card?.hint ?? '');
   const [busy, setBusy] = useState(false);
   const maxWrong = mcq ? MAX_OPTIONS - 1 : 3;
+  const wrong = d.slice(0, Math.max(3, mcq ? d.length : 3));
 
   const save = async () => {
     setBusy(true);
@@ -412,62 +408,121 @@ function CardEditor({ deckId, card, onClose, onSaved }: { deckId: string; card: 
   };
 
   return (
-    <Modal onClose={onClose}>
-      <h2>{card ? 'Edit card' : 'New card'}</h2>
-      <label className="field">
-        <span>Question</span>
-        <textarea className="input" rows={2} value={front} onChange={(e) => setFront(e.target.value)} autoFocus />
-      </label>
-      <label className="field">
-        <span>Answer</span>
-        <input className="input" value={back} onChange={(e) => setBack(e.target.value)} />
-      </label>
-      <label className="check">
-        <input type="checkbox" checked={mcq} onChange={(e) => setMcq(e.target.checked)} />
-        <span>Always ask as multiple choice, with every option below</span>
-      </label>
-      <div className="field">
-        <span>Wrong options for multiple choice{mcq ? '' : ' (optional)'}</span>
-        {d.slice(0, Math.max(3, mcq ? d.length : 3)).map((x, i) => (
-          <input key={i} className="input" value={x} placeholder={`Wrong option ${i + 1}`} onChange={(e) => setD(d.map((y, j) => (j === i ? e.target.value : y)))} />
-        ))}
-        {mcq && d.length < maxWrong && (
-          <button className="link" onClick={() => setD([...d, ''])}>
-            + Add an option
-          </button>
-        )}
-      </div>
-      <label className="field">
-        <span>Explanation (optional)</span>
-        <textarea className="input" rows={2} value={explanation} onChange={(e) => setExplanation(e.target.value)} />
-      </label>
-      <details className="field more-fields" open={!!(card?.code || card?.title || card?.hint)}>
-        <summary>Title, code and hint</summary>
-        <label className="field">
-          <span>Title (optional)</span>
-          <input className="input" value={title} placeholder="e.g. Calling a subclass method" onChange={(e) => setTitle(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>Code (optional)</span>
-          <textarea className="input mono" rows={5} value={code} onChange={(e) => setCode(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>Code language</span>
-          <input className="input" value={codeLang} placeholder="java, cpp, python, rust…" onChange={(e) => setCodeLang(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>Hint (optional)</span>
-          <input className="input" value={hint} onChange={(e) => setHint(e.target.value)} />
-        </label>
-      </details>
-      <div className="modal-actions">
-        <button className="btn ghost" onClick={onClose}>
-          Cancel
-        </button>
-        <button className="btn primary" disabled={busy || !front.trim() || !back.trim() || (mcq && !d.some((x) => x.trim()))} onClick={() => void save()}>
-          Save
-        </button>
-      </div>
-    </Modal>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="w-[min(640px,calc(100%-2rem))]" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>{card ? 'Edit card' : 'New card'}</DialogTitle>
+        </DialogHeader>
+        <Tabs defaultValue="edit">
+          <TabsList>
+            <TabsTrigger value="edit">✏️ Write</TabsTrigger>
+            <TabsTrigger value="preview" disabled={!front.trim()}>
+              👀 Preview
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="edit">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="card-front">Question</FieldLabel>
+                <Textarea id="card-front" rows={2} value={front} onChange={(e) => setFront(e.target.value)} autoFocus />
+                <FieldDescription>
+                  Markdown works everywhere on a card: **bold**, `code`, lists. Write math as <code className="font-mono">$x^2$</code> inline or{' '}
+                  <code className="font-mono">$$…$$</code> on its own line.
+                </FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="card-back">Answer</FieldLabel>
+                <Input id="card-back" value={back} onChange={(e) => setBack(e.target.value)} />
+              </Field>
+              <Field orientation="horizontal">
+                <Switch id="card-mcq" checked={mcq} onCheckedChange={setMcq} />
+                <FieldLabel htmlFor="card-mcq" className="font-normal">
+                  Always ask as multiple choice, with every option below
+                </FieldLabel>
+              </Field>
+              <Field>
+                <FieldLabel>Wrong options for multiple choice{mcq ? '' : ' (optional)'}</FieldLabel>
+                {wrong.map((x, i) => (
+                  <Input key={i} value={x} placeholder={`Wrong option ${i + 1}`} onChange={(e) => setD(d.map((y, j) => (j === i ? e.target.value : y)))} />
+                ))}
+                {mcq && d.length < maxWrong && (
+                  <Button variant="link" className="self-start" onClick={() => setD([...d, ''])}>
+                    + Add an option
+                  </Button>
+                )}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="card-expl">Explanation (optional)</FieldLabel>
+                <Textarea id="card-expl" rows={2} value={explanation} onChange={(e) => setExplanation(e.target.value)} />
+              </Field>
+              <Collapsible defaultOpen={!!(card?.code || card?.title || card?.hint)} className="flex flex-col gap-4">
+                <CollapsibleTrigger asChild>
+                  <Button variant="link" className="self-start text-sm">
+                    Title, code and hint
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="flex flex-col gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="card-title">Title (optional)</FieldLabel>
+                    <Input id="card-title" value={title} placeholder="e.g. Calling a subclass method" onChange={(e) => setTitle(e.target.value)} />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="card-code">Code (optional)</FieldLabel>
+                    <Textarea id="card-code" className="font-mono text-sm" rows={5} value={code} onChange={(e) => setCode(e.target.value)} />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="card-lang">Code language</FieldLabel>
+                    <Input id="card-lang" value={codeLang} placeholder="java, cpp, python, rust…" onChange={(e) => setCodeLang(e.target.value)} />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="card-hint">Hint (optional)</FieldLabel>
+                    <Input id="card-hint" value={hint} onChange={(e) => setHint(e.target.value)} />
+                  </Field>
+                </CollapsibleContent>
+              </Collapsible>
+            </FieldGroup>
+          </TabsContent>
+          <TabsContent value="preview">
+            <div className="rounded-lg border-[3px] border-primary bg-card px-6 pt-5 pb-6 shadow-[0_4px_0_var(--accent-soft-strong)]">
+              {title.trim() && <Badge variant="brand" className="mb-2">{title}</Badge>}
+              <Markdown className="font-display text-lg leading-snug font-semibold" text={front} />
+              {code.trim() && <CodeBlock code={code} lang={codeLang.trim().toLowerCase() || undefined} />}
+            </div>
+            <div className="flex flex-col gap-2 rounded-md bg-success-soft px-4 py-3">
+              <span className="text-xs text-muted-foreground">Answer</span>
+              <Markdown className="font-semibold text-success-ink" text={back || '…'} />
+              {d.some((x) => x.trim()) && (
+                <>
+                  <span className="text-xs text-muted-foreground">Wrong options</span>
+                  <ul className="flex flex-col gap-1">
+                    {d
+                      .filter((x) => x.trim())
+                      .map((x, i) => (
+                        <li key={i}>
+                          <Markdown inline text={x} />
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              )}
+              {hint.trim() && (
+                <p className="text-sm text-warning-ink">
+                  💡 <Markdown inline text={hint} />
+                </p>
+              )}
+              {explanation.trim() && <Markdown className="text-muted-foreground" text={explanation} />}
+            </div>
+          </TabsContent>
+        </Tabs>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="default" disabled={busy || !front.trim() || !back.trim() || (mcq && !d.some((x) => x.trim()))} onClick={() => void save()}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

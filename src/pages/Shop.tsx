@@ -2,6 +2,11 @@ import { SHOP, ownsItem, type ShopItem } from '../../shared/game.ts';
 import { api } from '../api.ts';
 import { useApp, useAppState } from '../app-context.tsx';
 import { Mascot } from '../components/Mascot.tsx';
+import { Page, SectionHead } from '../components/shared.tsx';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Tip } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { confetti } from '../fx.ts';
 import { patternImage } from '../theme-patterns.ts';
 import { sfx } from '../sound.ts';
@@ -45,89 +50,96 @@ export function Shop() {
   const removable = (item: ShopItem) => item.kind === 'hat' || item.kind === 'skin';
   const levelLocked = (item: ShopItem) => !!item.unlockLevel && level < item.unlockLevel;
 
+  const art = (locked: boolean) => cn(locked && 'opacity-45 grayscale');
   const section = (title: string, kinds: ShopItem['kind'][], note?: string, keep: (i: ShopItem) => boolean = () => true) => (
     <section>
-      <div className="section-head">
-        <h2>{title}</h2>
-        {note && <span className="muted small">{note}</span>}
-      </div>
-      <div className="shop-grid">
+      <SectionHead title={title}>{note && <span className="text-sm text-muted-foreground">{note}</span>}</SectionHead>
+      <div className="stagger grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {SHOP.filter((i) => kinds.includes(i.kind) && keep(i))
           // Owned and buyable first, then level-locked items by level.
           .sort((a, b) => (levelLocked(a) ? a.unlockLevel! : 0) - (levelLocked(b) ? b.unlockLevel! : 0))
           .map((item) => {
-          const consumable = item.kind === 'consumable' || item.kind === 'boost';
-          const own = !consumable && owns(item);
-          const locked = !own && levelLocked(item);
-          const maxed = item.id === 'freeze' && p.streak.freezes >= (item.max ?? 3);
-          return (
-            <div key={item.id} className={`shop-item ${equipped(item) && !consumable ? 'equipped' : ''} ${locked ? 'level-locked' : ''}`}>
-              {item.kind === 'theme' ? (
-                <div className="swatch">
-                  {(item.value as string[]).map((c, i) => (
-                    <span key={c} style={{ background: i === 0 ? `${patternImage(item.pattern, (item.value as string[])[2])} ${c}` : c }} />
-                  ))}
-                </div>
-              ) : item.kind === 'skin' ? (
-                <div className="shop-skin">
-                  <Mascot skin={item.id} hat={null} size={84} />
-                </div>
-              ) : item.kind === 'hat' ? (
-                <div className="shop-hat">
-                  <Mascot hat={item.id} size={64} />
-                </div>
-              ) : (
-                <div className="shop-icon">{item.icon}</div>
-              )}
-              <div className="shop-name">{item.name}</div>
-              <div className="muted small">{item.desc}</div>
-              {item.id === 'freeze' && <div className="muted small">You have {p.streak.freezes}/3</div>}
-              {consumable ? (
-                <button className="btn primary small" disabled={p.coins < item.price || maxed} onClick={() => void buy(item)}>
-                  {maxed ? (
-                    'Maxed'
+            const consumable = item.kind === 'consumable' || item.kind === 'boost';
+            const own = !consumable && owns(item);
+            const locked = !own && levelLocked(item);
+            const maxed = item.id === 'freeze' && p.streak.freezes >= (item.max ?? 3);
+            const on = equipped(item) && !consumable;
+            return (
+              <Card
+                key={item.id}
+                className={cn('items-center gap-1 px-4 pt-6 pb-4 text-center text-sm', on && 'border-primary shadow-[0_3px_0_var(--accent-soft-strong)]', locked && 'text-muted-foreground')}
+              >
+                {item.kind === 'theme' ? (
+                  <div className={cn('mb-2 flex h-14 w-full overflow-hidden rounded-md border-2 border-border', art(locked))}>
+                    {(item.value as string[]).map((c, i) => (
+                      <span key={c} className="flex-1 last:flex-[0_0_25%]" style={{ background: i === 0 ? `${patternImage(item.pattern, (item.value as string[])[2])} ${c}` : c }} />
+                    ))}
+                  </div>
+                ) : item.kind === 'skin' ? (
+                  <div className={cn('mb-2 grid h-32 w-full place-items-center rounded-md bg-muted', locked && '[&_.mascot]:opacity-85')}>
+                    <Mascot skin={item.id} hat={null} size={84} />
+                  </div>
+                ) : item.kind === 'hat' ? (
+                  <div className={cn('mb-2 grid size-16 place-items-center rounded-full bg-muted [&_.mascot]:-mt-3.5', art(locked))}>
+                    <Mascot hat={item.id} size={64} />
+                  </div>
+                ) : (
+                  <div className={cn('mb-2 grid size-16 place-items-center rounded-full bg-muted text-[34px]', art(locked))}>{item.icon}</div>
+                )}
+                <div className={cn('font-display text-md font-semibold', !locked && 'text-foreground')}>{item.name}</div>
+                <div className="flex-1 text-muted-foreground">{item.desc}</div>
+                {item.id === 'freeze' && <div className="text-muted-foreground">You have {p.streak.freezes}/3</div>}
+                <div className="mt-2 w-full">
+                  {consumable ? (
+                    <Button size="sm" variant="default" className="w-full" disabled={p.coins < item.price || maxed} onClick={() => void buy(item)}>
+                      {maxed ? 'Maxed' : <>🪙 {item.price}</>}
+                    </Button>
+                  ) : own ? (
+                    <Button size="sm" variant="ghost" className="w-full" disabled={equipped(item) && !removable(item)} onClick={() => void equip(item)}>
+                      {equipped(item) ? (removable(item) ? 'Take off' : 'Equipped') : removable(item) ? 'Wear' : 'Equip'}
+                    </Button>
+                  ) : locked ? (
+                    <Tip label={item.price === 0 ? 'Free when you reach this level' : 'Goes on sale at this level'}>
+                      <span className="block">
+                        <Button size="sm" className="w-full" disabled>
+                          🔒 Level {item.unlockLevel}
+                          {item.price > 0 && <> · 🪙 {item.price}</>}
+                        </Button>
+                      </span>
+                    </Tip>
                   ) : (
-                    <>
+                    <Button size="sm" className="w-full" disabled={p.coins < item.price} onClick={() => void buy(item)}>
                       🪙 {item.price}
-                    </>
+                    </Button>
                   )}
-                </button>
-              ) : own ? (
-                <button className="btn ghost small" disabled={equipped(item) && !removable(item)} onClick={() => void equip(item)}>
-                  {equipped(item) ? (removable(item) ? 'Take off' : 'Equipped') : removable(item) ? 'Wear' : 'Equip'}
-                </button>
-              ) : locked ? (
-                <button className="btn small" disabled title={item.price === 0 ? 'Free when you reach this level' : 'Goes on sale at this level'}>
-                  🔒 Level {item.unlockLevel}
-                  {item.price > 0 && <> · 🪙 {item.price}</>}
-                </button>
-              ) : (
-                <button className="btn small" disabled={p.coins < item.price} onClick={() => void buy(item)}>
-                  🪙 {item.price}
-                </button>
-              )}
-            </div>
-          );
-        })}
+                </div>
+              </Card>
+            );
+          })}
       </div>
     </section>
   );
 
   return (
-    <div className="page">
-      <div className="section-head">
-        <h1>Shop 🛍️</h1>
-        <span className="coin-balance" title="Your coins">
-          🪙 {p.coins}
-        </span>
+    <Page>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1>Shop 🛍️</h1>
+          <span
+            className="inline-flex h-11 items-center gap-1.5 rounded-full border-2 border-border bg-card pr-6 pl-4 font-display text-lg font-bold"
+            title="Your coins"
+          >
+            🪙 {p.coins}
+          </span>
+        </div>
+        <p className="text-muted-foreground">Earn coins from XP (1 per 10 XP), daily quests and chests. Everything here is cosmetic or a study helper. Your learning is never paywalled.</p>
       </div>
-      <p className="muted">Earn coins from XP (1 per 10 XP), daily quests and chests. Everything here is cosmetic or a study helper. Your learning is never paywalled.</p>
       {section('Power-ups', ['consumable', 'boost'])}
       {section('Skins for Flicky', ['skin'], 'The rarest things in Flick. Save up!')}
       {section('Hats for Flicky', ['hat'], 'Level rewards are free; see them all on your Journey.')}
       {section('Premium themes', ['theme'], 'Each with its own background pattern.', (i) => !!i.pattern)}
       {section('Themes', ['theme'], undefined, (i) => !i.pattern)}
       {section('Avatars', ['avatar'], 'The default avatar is free; equip it in Settings.')}
-    </div>
+    </Page>
   );
 }
