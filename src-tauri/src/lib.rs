@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_updater::UpdaterExt;
@@ -97,9 +97,61 @@ fn start_server(app: &AppHandle) -> Result<u16, String> {
 /// How often a running app checks for a new version, besides at launch.
 const UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
 
+/// Builds made without the updater key (local builds, and CI builds before
+/// the key was added) can't verify an update, so they shouldn't offer one.
+fn updates_enabled(app: &AppHandle) -> bool {
+    app.config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|u| u.get("pubkey"))
+        .and_then(|k| k.as_str())
+        .is_some_and(|k| !k.trim().is_empty())
+}
+
+/// macOS runs a quarantined app from a read-only copy ("App Translocation"),
+/// which the updater can't replace.
+fn is_translocated() -> bool {
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().contains("/AppTranslocation/"))
+        .unwrap_or(false)
+}
+
+fn alert(app: &AppHandle, title: &str, message: String) {
+    app.dialog().message(message).title(title).show(|_| {});
+}
+
+async fn ask(app: &AppHandle, title: &str, message: String, ok: &str, cancel: &str) -> bool {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let ok_label = ok.to_string();
+    app.dialog()
+        .message(message)
+        .title(title)
+        .buttons(MessageDialogButtons::OkCancelCustom(ok.into(), cancel.into()))
+        .show_with_result(move |result| {
+            let yes = match result {
+                MessageDialogResult::Ok | MessageDialogResult::Yes => true,
+                MessageDialogResult::Custom(label) => label == ok_label,
+                _ => false,
+            };
+            let _ = tx.send(yes);
+        });
+    rx.await.unwrap_or(false)
+}
+
+fn set_title(app: &AppHandle, title: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_title(title);
+    }
+}
+
 /// Checks GitHub Releases for a newer signed build. If there is one, asks
 /// whether to install it now; on yes it downloads, installs and restarts.
+/// A failed check (offline, say) is only logged; a failed install is shown.
 async fn check_for_update(app: AppHandle) -> Result<(), String> {
+    if !updates_enabled(&app) {
+        return Ok(());
+    }
     let Some(update) = app
         .updater()
         .map_err(|e| e.to_string())?
@@ -110,25 +162,47 @@ async fn check_for_update(app: AppHandle) -> Result<(), String> {
         return Ok(());
     };
 
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .message(format!(
-            "Flick {} is available (you have {}). Update now? Flick will restart.",
-            update.version, update.current_version
-        ))
-        .title("Update available")
-        .buttons(MessageDialogButtons::OkCancelCustom("Update".into(), "Later".into()))
-        .show(move |yes| {
-            let _ = tx.send(yes);
-        });
-    if !rx.await.unwrap_or(false) {
+    let message = format!(
+        "Flick {} is available (you have {}). Update now? Flick will restart.",
+        update.version, update.current_version
+    );
+    if !ask(&app, "Update available", message, "Update", "Later").await {
         return Ok(());
     }
 
-    update
-        .download_and_install(|_, _| {}, || {})
-        .await
-        .map_err(|e| e.to_string())?;
+    if is_translocated() {
+        alert(
+            &app,
+            "Can't update yet",
+            "macOS is running Flick from a temporary read-only copy, so it can't replace itself. \
+             Quit Flick, run this once in Terminal, then open Flick again:\n\n\
+             xattr -dr com.apple.quarantine /Applications/Flick.app"
+                .into(),
+        );
+        return Ok(());
+    }
+
+    let mut downloaded: usize = 0;
+    let progress_app = app.clone();
+    let result = update
+        .download_and_install(
+            move |chunk, total| {
+                downloaded += chunk;
+                if let Some(total) = total.filter(|t| *t > 0) {
+                    let pct = (downloaded as u64 * 100 / total).min(100);
+                    set_title(&progress_app, &format!("Flick: downloading update {pct}%"));
+                }
+            },
+            || {},
+        )
+        .await;
+    if let Err(e) = result {
+        set_title(&app, "Flick");
+        alert(&app, "Update failed", format!("Flick couldn't install the update: {e}"));
+        return Ok(());
+    }
+
+    set_title(&app, "Flick: restarting");
     if let Some(child) = app.state::<Server>().0.lock().unwrap().take() {
         let _ = child.kill();
     }

@@ -88,13 +88,24 @@ npm run app:build    # build Flick.app and a .dmg into src-tauri/target/release/
 - **Web link**: Claude fetches the page with `WebFetch`.
 - **Topic**: no material needed; Claude writes cards from its own knowledge.
 - **Import list**: Quizlet exports, Anki plain-text exports, CSV, `term - definition`. Instant, no AI. Then use **Make quiz options with Claude** to generate multiple-choice distractors.
-- **Paste MCQs**: bulk-import exam-style multiple-choice questions written by any AI chat. Copy Flick's prompt (it asks for questions that test understanding, with one named misconception behind each wrong option), paste the reply, and Flick checks it as you paste. Questions can have 2 to 10 options, a code block in any language (syntax-highlighted), a hint and an explanation. Instant, no Claude Code call.
-- **Style**: Claude can write short-answer **flashcards** or **multiple choice** questions (exam-style, with code when it fits).
-- Options: number of cards, focus, and level. Every flashcard gets 3 plausible distractors and a short explanation.
+- **Paste from AI**: bulk-import cards written by any AI chat. Copy Flick's prompt, paste the reply, and Flick checks it as you paste. Multiple-choice questions can have 2 to 10 options, a code block in any language (syntax-highlighted), a hint and an explanation. Instant, no Claude Code call.
+- **How many and which kind**: there is no card count. Claude (or the AI you paste from) writes as many cards as it takes to cover every idea in the material, and picks the better type per idea: a short-answer **flashcard** for facts, terms and reasons, or an exam-style **multiple-choice question** (with code when it fits) for mechanisms and "what happens" questions. The writing rules follow the anki-flashcards, cracked-mcq and explain skills and live in `shared/mcq.ts`.
+- Options: focus and level. Every flashcard gets 3 plausible distractors and a short explanation.
 - Each deck has a **Materials** tab listing every source and the cards made from it. Adding more material to a deck tells Claude to avoid duplicating existing cards.
 
-#### MCQ import format
-Each question starts with a `## ` title line. Everything else is optional except the options, and exactly one option is marked `[x]`. Flick shuffles options, so they must not refer to each other by letter.
+#### Paste format
+Each card starts with a `## ` title line. A **flashcard** has an `Answer:` line, optionally followed by wrong answers as `- [ ]` lines. A **multiple-choice question** has options with exactly one marked `[x]`. Flick shuffles options, so they must not refer to each other by letter.
+
+```markdown
+## Where the Krebs cycle runs
+In eukaryotic cells, where does the Krebs cycle take place?
+
+Answer: The mitochondrial matrix
+- [ ] The cytoplasm
+- [ ] The inner mitochondrial membrane
+
+Explanation: The cycle's enzymes are dissolved in the matrix.
+```
 
 ````markdown
 ## Calling a subclass method

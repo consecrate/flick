@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ACHIEVEMENTS, SHOP, addDays, checkAchievements, effectiveStreak, levelInfo, localDay, masteryTier, ownsItem, rollChest } from '../shared/game.ts';
-import { isValidModel, type Card, type Deck, type Material, type SessionComplete, type Settings, type AnswerRequest } from '../shared/types.ts';
+import { canMoveFolder } from '../shared/folders.ts';
+import { isValidModel, type Card, type Deck, type Folder, type Material, type SessionComplete, type Settings, type AnswerRequest } from '../shared/types.ts';
 import { MAX_OPTIONS, normalizeLang, parseMcqs } from '../shared/mcq.ts';
 import { explainCard, generateCards, gradeAnswer, makeDistractors, parsePairs } from './ai.ts';
 import { ClaudeError, UPLOAD_DIR, callClaude, claudeVersion } from './claude.ts';
@@ -18,9 +19,12 @@ import {
   completeSession,
   deckCards,
   ensureQuests,
+  folderDeckIds,
   practiceQueue,
   studyQueue,
   summarizeDeck,
+  summarizeFolder,
+  type Scope,
 } from './game.ts';
 import { isDue, newSrs, preview, retrievability } from './srs.ts';
 
@@ -52,6 +56,18 @@ function findDeck(id: string): Deck {
   const d = db.decks.find((x) => x.id === id);
   if (!d) throw new HttpError(404, 'Deck not found');
   return d;
+}
+
+function findFolder(id: string): Folder {
+  const f = db.folders.find((x) => x.id === id);
+  if (!f) throw new HttpError(404, 'Folder not found');
+  return f;
+}
+
+/** Read a folder id from a request body: null (or missing) means the top level. */
+function folderIdFrom(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  return findFolder(String(v)).id;
 }
 
 function findCard(id: string): Card {
@@ -155,6 +171,7 @@ app.get('/api/state', (req, res) => {
     level: levelInfo(p.xp),
     settings: db.settings,
     decks: db.decks.map((d) => summarizeDeck(d.id)),
+    folders: db.folders.map((f) => summarizeFolder(f.id)),
     dueTotal: active.filter((c) => isDue(c.srs, now)).length,
     newTotal: active.filter((c) => c.srs.state === 0).length,
     todayXp: p.dailyXp[day] ?? 0,
@@ -169,7 +186,9 @@ app.get('/api/state', (req, res) => {
 // ---------- decks & cards ----------
 
 app.post('/api/decks', (req, res) => {
+  const folderId = folderIdFrom(req.body.folderId);
   const deck = createDeck(String(req.body.title ?? ''), req.body.emoji, String(req.body.description ?? ''));
+  if (folderId) deck.folderId = folderId;
   const newAchievements = checkAchievements(db.profile);
   save();
   res.json({ ...summarizeDeck(deck.id), newAchievements });
@@ -196,6 +215,7 @@ app.patch(
     for (const k of ['title', 'emoji', 'description', 'color'] as const) {
       if (typeof req.body[k] === 'string') deck[k] = req.body[k];
     }
+    if ('folderId' in req.body) deck.folderId = folderIdFrom(req.body.folderId);
     save();
     res.json(summarizeDeck(deck.id));
   }),
@@ -208,6 +228,53 @@ app.delete(
     db.decks = db.decks.filter((d) => d.id !== deck.id);
     db.cards = db.cards.filter((c) => c.deckId !== deck.id);
     db.materials = db.materials.filter((m) => m.deckId !== deck.id);
+    save();
+    res.json({ ok: true });
+  }),
+);
+
+// ---------- folders ----------
+
+app.post(
+  '/api/folders',
+  wrap((req, res) => {
+    const folder: Folder = {
+      id: uid(),
+      title: String(req.body.title ?? '').trim().slice(0, 80) || 'New folder',
+      emoji: typeof req.body.emoji === 'string' && req.body.emoji ? req.body.emoji : '📁',
+      parentId: folderIdFrom(req.body.parentId),
+      createdAt: new Date().toISOString(),
+    };
+    db.folders.push(folder);
+    save();
+    res.json(summarizeFolder(folder.id));
+  }),
+);
+
+app.patch(
+  '/api/folders/:id',
+  wrap((req, res) => {
+    const folder = findFolder(req.params.id as string);
+    if (typeof req.body.title === 'string' && req.body.title.trim()) folder.title = req.body.title.trim().slice(0, 80);
+    if (typeof req.body.emoji === 'string' && req.body.emoji) folder.emoji = req.body.emoji;
+    if ('parentId' in req.body) {
+      const parentId = folderIdFrom(req.body.parentId);
+      if (!canMoveFolder(db.folders, folder.id, parentId)) throw new HttpError(400, 'A folder cannot go inside itself');
+      folder.parentId = parentId;
+    }
+    save();
+    res.json(summarizeFolder(folder.id));
+  }),
+);
+
+// Deleting a folder keeps everything in it: its decks and subfolders move up one level.
+app.delete(
+  '/api/folders/:id',
+  wrap((req, res) => {
+    const folder = findFolder(req.params.id as string);
+    for (const d of db.decks) if (d.folderId === folder.id) d.folderId = folder.parentId;
+    for (const f of db.folders) if (f.parentId === folder.id) f.parentId = folder.parentId;
+    db.folders = db.folders.filter((f) => f.id !== folder.id);
     save();
     res.json({ ok: true });
   }),
@@ -289,7 +356,6 @@ app.post(
   wrap(async (req, res) => {
     const b = req.body ?? {};
     const source = b.source ?? {};
-    const count = Math.max(3, Math.min(60, Number(b.count) || 15));
     let deck = b.deckId ? findDeck(b.deckId) : null;
     const existingFronts = deck ? db.cards.filter((c) => c.deckId === deck!.id).map((c) => (c.title ? `${c.title}: ${c.front}` : c.front)) : [];
 
@@ -310,11 +376,11 @@ app.post(
     if (source.type === 'mcq') {
       const { questions, errors } = parseMcqs(String(source.text ?? ''));
       if (!questions.length) {
-        throw new HttpError(400, errors.length ? `${errors.length === 1 ? 'The question' : `None of the ${errors.length} questions`} could be read. ${errors[0].title}: ${errors[0].message}.` : 'No questions found. Each question must start with a "## " title line.');
+        throw new HttpError(400, errors.length ? `${errors.length === 1 ? 'The card' : `None of the ${errors.length} cards`} could be read. ${errors[0].title}: ${errors[0].message}.` : 'No cards found. Each card must start with a "## " title line.');
       }
-      deck ??= createDeck(String(b.title ?? '') || 'Imported questions', '🎯');
-      const mat = addMaterial(deck.id, 'mcq', `Imported questions (${questions.length})`, questions.slice(0, 3).map((q) => q.title || q.question).join(' · '));
-      const added = questions.map((q) => addCard(deck!.id, { ...q, front: q.question, back: q.answer, mcq: true }, mat.id));
+      deck ??= createDeck(String(b.title ?? '') || 'Imported cards', '📋');
+      const mat = addMaterial(deck.id, 'mcq', `Pasted from AI (${questions.length})`, questions.slice(0, 3).map((q) => q.title || q.question).join(' · '));
+      const added = questions.map(({ flashcard, ...q }) => addCard(deck!.id, { ...q, title: flashcard ? undefined : q.title, front: q.question, back: q.answer, mcq: !flashcard }, mat.id));
       mat.cardCount = added.length;
       save();
       res.json({ deck: summarizeDeck(deck.id), added: added.length, skipped: errors.length, material: mat, newAchievements: checkAchievements(db.profile) });
@@ -365,11 +431,9 @@ app.post(
         files,
         topic: source.type === 'topic' ? String(source.topic) : undefined,
         url: source.type === 'url' ? String(source.url) : undefined,
-        count,
         focus: b.focus ? String(b.focus) : undefined,
         level: b.level ? String(b.level) : undefined,
         existingFronts,
-        style: b.style === 'mcq' ? 'mcq' : 'cards',
         model: db.settings.model,
         thinking: db.settings.thinking,
       });
@@ -459,30 +523,34 @@ app.get(
   wrap((req, res) => {
     const day = dayOf(req);
     const deckId = (req.query.deckId as string) || null;
+    const folderId = (req.query.folderId as string) || null;
     if (deckId) findDeck(deckId);
+    if (folderId) findFolder(folderId);
+    const scope: Scope = deckId ? [deckId] : folderId ? folderDeckIds(folderId) : null;
     const mode = String(req.query.mode ?? 'quiz');
     const size = Math.max(4, Math.min(50, Number(req.query.size) || db.settings.sessionSize));
     let cards: Card[];
     let ahead = false;
     if (mode === 'quiz' || mode === 'flashcards') {
-      cards = studyQueue(deckId, day, size);
+      cards = studyQueue(scope, day, size);
       if (!cards.length && req.query.ahead === '1') {
-        cards = aheadQueue(deckId, size);
+        cards = aheadQueue(scope, size);
         ahead = true;
       }
-    } else if (mode === 'boss') cards = bossQueue(deckId, 10);
+    } else if (mode === 'boss') cards = bossQueue(scope, 10);
     // Match pairs short questions with answers, so code questions sit it out.
-    else if (mode === 'match') cards = practiceQueue(deckId, 6, (c) => !c.code && !c.mcq);
-    else cards = practiceQueue(deckId, 200);
+    else if (mode === 'match') cards = practiceQueue(scope, 6, (c) => !c.code && !c.mcq);
+    else cards = practiceQueue(scope, 200);
 
     // Pool of other answers in the deck, used to build MCQ options for cards without distractors.
-    const pool = [...new Set(deckCards(deckId).filter((c) => !c.mcq).map((c) => c.back))].slice(0, 300);
+    const pool = [...new Set(deckCards(scope).filter((c) => !c.mcq).map((c) => c.back))].slice(0, 300);
     const now = new Date();
     res.json({
       cards: cards.map((c) => ({ ...cardView(c, now), previews: mode === 'flashcards' ? preview(c.srs, db.settings, now) : undefined })),
       pool,
       ahead,
       deck: deckId ? summarizeDeck(deckId) : null,
+      folder: folderId ? summarizeFolder(folderId) : null,
     });
   }),
 );
@@ -702,7 +770,7 @@ app.post(
     if (!data || data.version !== 1 || !Array.isArray(data.decks) || !Array.isArray(data.cards) || !data.profile) {
       throw new HttpError(400, 'That does not look like a Flick backup');
     }
-    replaceAll(data);
+    replaceAll({ ...data, folders: Array.isArray(data.folders) ? data.folders : [] });
     res.json({ ok: true });
   }),
 );

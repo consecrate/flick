@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { buildMcqPrompt, parseMcqs } from '../../shared/mcq.ts';
+import { buildImportPrompt, parseMcqs } from '../../shared/mcq.ts';
 import { api, type GenerateResult, type SourceInput } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
 import { sfx } from '../sound.ts';
@@ -13,7 +13,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'url', label: 'Web link' },
   { id: 'topic', label: 'Topic' },
   { id: 'pairs', label: 'Import list' },
-  { id: 'mcq', label: 'Paste MCQs' },
+  { id: 'mcq', label: 'Paste from AI' },
 ];
 
 /** Put text on the clipboard, falling back to a hidden textarea where the async API is blocked. */
@@ -34,6 +34,8 @@ async function copyText(text: string) {
   }
 }
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.md,.csv,.tsv,.html,.srt,.vtt,.json';
 const MAX_BYTES = 30 * 1024 * 1024;
 
@@ -46,25 +48,23 @@ function readBase64(file: File): Promise<string> {
   });
 }
 
-export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onClose: () => void; onDone: (r: GenerateResult) => void }) {
+export function ImportModal({ deckId, folderId, onClose, onDone }: { deckId?: string; folderId?: string | null; onClose: () => void; onDone: (r: GenerateResult) => void }) {
   const { showError, refresh, announceAchievements, toast } = useApp();
   const [tab, setTab] = useState<Tab>('files');
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
   const [topic, setTopic] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [count, setCount] = useState(15);
   const [focus, setFocus] = useState('');
   const [level, setLevel] = useState('');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
-  const [style, setStyle] = useState<'cards' | 'mcq'>('cards');
   const [mcqText, setMcqText] = useState('');
   const [mcqTopic, setMcqTopic] = useState('');
   const [copied, setCopied] = useState(false);
   const [blank, setBlank] = useState(false);
-  const prompt = useMemo(() => buildMcqPrompt({ topic: mcqTopic, count, level }), [mcqTopic, count, level]);
+  const prompt = useMemo(() => buildImportPrompt({ topic: mcqTopic, level }), [mcqTopic, level]);
   const parsed = useMemo(() => (tab === 'mcq' && mcqText.trim() ? parseMcqs(mcqText) : null), [tab, mcqText]);
 
   const copyPrompt = async () => {
@@ -108,10 +108,10 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
       else if (tab === 'topic') source = { type: 'topic', topic };
       else if (tab === 'pairs') source = { type: 'pairs', text };
       else source = { type: 'mcq', text: mcqText };
-      const r = await api.generate({ deckId, source, count, focus: focus || undefined, level: level || undefined, title: title || undefined, style });
+      const r = await api.generate({ deckId, source, focus: focus || undefined, level: level || undefined, title: title || undefined });
       sfx.unlock();
-      toast({ title: `${r.added} ${tab === 'mcq' || style === 'mcq' ? 'questions' : 'cards'} added to ${r.deck.title}`, kind: 'success' });
-      if (r.skipped) toast({ title: `${r.skipped} question${r.skipped === 1 ? '' : 's'} skipped`, body: 'They were not in the expected format.' });
+      toast({ title: `${r.added} cards added to ${r.deck.title}`, kind: 'success' });
+      if (r.skipped) toast({ title: `${r.skipped} card${r.skipped === 1 ? '' : 's'} skipped`, body: 'They were not in the expected format.' });
       if (r.needsDistractors) {
         toast({ title: 'Tip: use “Write quiz options” on the deck', body: 'Claude can write multiple-choice options for imported cards.' });
       }
@@ -128,7 +128,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
   const createEmpty = async () => {
     setBusy(true);
     try {
-      const d = await api.createDeck({ title });
+      const d = await api.createDeck({ title, folderId });
       sfx.unlock();
       await refresh();
       announceAchievements(d.newAchievements);
@@ -168,7 +168,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
   return (
     <Modal onClose={busy ? () => {} : onClose} wide>
       <h2>{deckId ? 'Add study material' : 'Create a deck'}</h2>
-      <p className="muted">Drop in anything you are studying and Claude turns it into quiz-ready flashcards.</p>
+      <p className="muted">Drop in anything you are studying. Claude covers all of it with a mix of flashcards and multiple-choice questions.</p>
       {busy ? (
         tab === 'pairs' || tab === 'mcq' ? (
           <ClaudeLoader lines={['Importing your cards…']} />
@@ -253,18 +253,11 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
                   <span className="step-num">1</span>
                   <div className="grow">
                     <b>Copy the prompt into Claude or any AI chat</b>
-                    <p className="muted small">Then attach or paste your notes, slides or past exam. The prompt asks for hard, fair questions with code where it fits.</p>
+                    <p className="muted small">Then attach or paste your notes, slides or past exam. The AI decides how many cards it takes to cover everything, and mixes flashcards with multiple-choice questions (with code where it fits).</p>
                   </div>
                 </div>
                 <div className="mcq-prompt-opts">
                   <input className="input" placeholder="Topic (optional), e.g. Java inheritance, C++ move semantics" value={mcqTopic} onChange={(e) => setMcqTopic(e.target.value)} />
-                  <select className="input" value={count} onChange={(e) => setCount(+e.target.value)} aria-label="Number of questions">
-                    {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map((n) => (
-                      <option key={n} value={n}>
-                        {n} questions
-                      </option>
-                    ))}
-                  </select>
                   <button className={`btn ${copied ? 'good' : 'primary'}`} onClick={() => void copyPrompt()}>
                     {copied ? '✅ Copied' : '📋 Copy prompt'}
                   </button>
@@ -284,7 +277,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
                 <textarea
                   className="input mono"
                   rows={9}
-                  placeholder={'## Calling a subclass method\nIn Java, what happens when you run this?\n\n```java\n...\n```\n\n- [x] Compilation error\n- [ ] Prints Woof, then Fetching\n\nHint: ...\nExplanation: ...'}
+                  placeholder={'## Where the Krebs cycle runs\nIn eukaryotic cells, where does the Krebs cycle take place?\nAnswer: The mitochondrial matrix\n\n## Calling a subclass method\nIn Java, what happens when you run this?\n```java\n...\n```\n- [x] Compilation error\n- [ ] Prints Woof, then Fetching'}
                   value={mcqText}
                   onChange={(e) => setMcqText(e.target.value)}
                 />
@@ -292,12 +285,15 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
                   <div className="mcq-check">
                     {parsed.questions.length > 0 && (
                       <div className="mcq-ok">
-                        ✅ {parsed.questions.length} question{parsed.questions.length === 1 ? '' : 's'} ready
-                        {parsed.questions.some((q) => q.code) && <span className="muted"> · {parsed.questions.filter((q) => q.code).length} with code</span>}
-                        <span className="muted"> · up to {Math.max(...parsed.questions.map((q) => q.distractors.length + 1))} options</span>
+                        ✅ {parsed.questions.length} card{parsed.questions.length === 1 ? '' : 's'} ready
+                        <span className="muted">
+                          {' · '}
+                          {plural(parsed.questions.filter((q) => q.flashcard).length, 'flashcard')} · {parsed.questions.filter((q) => !q.flashcard).length} multiple choice
+                          {parsed.questions.some((q) => q.code) && ` · ${parsed.questions.filter((q) => q.code).length} with code`}
+                        </span>
                       </div>
                     )}
-                    {parsed.questions.length === 0 && parsed.errors.length === 0 && <div className="mcq-bad">No questions found. Each question must start with a line like “## Title”.</div>}
+                    {parsed.questions.length === 0 && parsed.errors.length === 0 && <div className="mcq-bad">No cards found. Each card must start with a line like “## Title”.</div>}
                     {parsed.errors.slice(0, 4).map((e) => (
                       <div key={e.index} className="mcq-bad">
                         ⚠️ <b>{e.title}</b> {e.message}. It will be skipped.
@@ -312,24 +308,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
           )}
 
           {tab !== 'pairs' && tab !== 'mcq' && (
-            <div className="segmented" role="radiogroup" aria-label="Card style">
-              <button role="radio" aria-checked={style === 'cards'} className={style === 'cards' ? 'active' : ''} onClick={() => setStyle('cards')}>
-                🃏 Flashcards <span className="muted small">short answers you recall</span>
-              </button>
-              <button role="radio" aria-checked={style === 'mcq'} className={style === 'mcq' ? 'active' : ''} onClick={() => setStyle('mcq')}>
-                🎯 Multiple choice <span className="muted small">exam-style, with code when it fits</span>
-              </button>
-            </div>
-          )}
-
-          {tab !== 'pairs' && tab !== 'mcq' && (
             <div className="gen-options">
-              <label>
-                <span>
-                  {style === 'mcq' ? 'Questions' : 'Cards'}: {count}
-                </span>
-                <input type="range" min={5} max={50} step={5} value={count} onChange={(e) => setCount(+e.target.value)} />
-              </label>
               <label>
                 <span>Focus (optional)</span>
                 <input className="input" placeholder="e.g. dates and key people" value={focus} onChange={(e) => setFocus(e.target.value)} />
@@ -360,7 +339,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
               Cancel
             </button>
             <button className="btn primary big" disabled={!ready} onClick={() => void submit()}>
-              {tab === 'pairs' ? 'Import cards' : tab === 'mcq' ? `Import ${parsed?.questions.length || ''} questions` : style === 'mcq' ? '✨ Generate questions' : '✨ Generate flashcards'}
+              {tab === 'pairs' ? 'Import cards' : tab === 'mcq' ? `Import ${parsed?.questions.length || ''} cards` : '✨ Generate cards'}
             </button>
           </div>
         </>

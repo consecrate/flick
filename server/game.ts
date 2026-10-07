@@ -15,11 +15,13 @@ import {
   ratingFromAnswer,
   xpForAnswer,
 } from '../shared/game.ts';
+import { folderSubtree } from '../shared/folders.ts';
 import type {
   AnswerRequest,
   AnswerResult,
   Card,
   DeckSummary,
+  FolderSummary,
   Profile,
   QuestKind,
   Reward,
@@ -217,14 +219,24 @@ function newIntroducedToday(day: string): number {
   return db.reviews.filter((r) => r.day === day && r.wasNew).length;
 }
 
-export function deckCards(deckId: string | null): Card[] {
-  return db.cards.filter((c) => !c.suspended && (deckId === null || c.deckId === deckId));
+/** Which decks a session draws from: a list of deck ids, or null for every deck. */
+export type Scope = string[] | null;
+
+export function deckCards(scope: Scope): Card[] {
+  const ids = scope && new Set(scope);
+  return db.cards.filter((c) => !c.suspended && (!ids || ids.has(c.deckId)));
+}
+
+/** Deck ids inside a folder and all of its subfolders. */
+export function folderDeckIds(folderId: string): string[] {
+  const folders = folderSubtree(db.folders, folderId);
+  return db.decks.filter((d) => d.folderId && folders.has(d.folderId)).map((d) => d.id);
 }
 
 /** Cards for a scheduled quiz/flashcard session: due reviews first, then new cards. */
-export function studyQueue(deckId: string | null, day: string, size: number): Card[] {
+export function studyQueue(scope: Scope, day: string, size: number): Card[] {
   const now = new Date();
-  const cards = deckCards(deckId);
+  const cards = deckCards(scope);
   const due = cards
     .filter((c) => isDue(c.srs, now))
     .sort((a, b) => retrievability(a.srs, db.settings, now) - retrievability(b.srs, db.settings, now));
@@ -240,9 +252,9 @@ export function studyQueue(deckId: string | null, day: string, size: number): Ca
 }
 
 /** Cards that are not due yet, soonest first. Used for optional extra practice. */
-export function aheadQueue(deckId: string | null, size: number): Card[] {
+export function aheadQueue(scope: Scope, size: number): Card[] {
   const now = new Date();
-  return deckCards(deckId)
+  return deckCards(scope)
     .filter((c) => c.srs.state !== 0 && !isDue(c.srs, now))
     .sort((a, b) => retrievability(a.srs, db.settings, now) - retrievability(b.srs, db.settings, now))
     .slice(0, size);
@@ -258,15 +270,15 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /** Hardest cards for a boss fight: most lapses, highest difficulty, lowest recall. */
-export function bossQueue(deckId: string | null, size = 10): Card[] {
+export function bossQueue(scope: Scope, size = 10): Card[] {
   const now = new Date();
-  const seen = deckCards(deckId).filter((c) => c.srs.state !== 0);
+  const seen = deckCards(scope).filter((c) => c.srs.state !== 0);
   const score = (c: Card) => c.srs.lapses * 3 + c.srs.difficulty - retrievability(c.srs, db.settings, now) * 5;
   return shuffle(seen.sort((a, b) => score(b) - score(a)).slice(0, size));
 }
 
-export function practiceQueue(deckId: string | null, size: number, keep: (c: Card) => boolean = () => true): Card[] {
-  return shuffle(deckCards(deckId).filter(keep)).slice(0, size);
+export function practiceQueue(scope: Scope, size: number, keep: (c: Card) => boolean = () => true): Card[] {
+  return shuffle(deckCards(scope).filter(keep)).slice(0, size);
 }
 
 export const BOSS_MIN_CARDS = 4;
@@ -285,6 +297,26 @@ export function summarizeDeck(deckId: string): DeckSummary | null {
     newCount: active.filter((c) => c.srs.state === 0).length,
     mastery,
     materials: db.materials.filter((m) => m.deckId === deckId).length,
+    bossReady: active.filter((c) => c.srs.state !== 0).length >= BOSS_MIN_CARDS,
+  };
+}
+
+export function summarizeFolder(folderId: string): FolderSummary | null {
+  const folder = db.folders.find((f) => f.id === folderId);
+  if (!folder) return null;
+  const now = new Date();
+  const deckIds = new Set(folderDeckIds(folderId));
+  const cards = db.cards.filter((c) => deckIds.has(c.deckId));
+  const active = cards.filter((c) => !c.suspended);
+  const mastery = active.length ? active.reduce((s, c) => s + masteryScore(c.srs), 0) / active.length : 0;
+  return {
+    ...folder,
+    deckCount: deckIds.size,
+    folderCount: folderSubtree(db.folders, folderId).size - 1,
+    cardCount: cards.length,
+    dueCount: active.filter((c) => isDue(c.srs, now)).length,
+    newCount: active.filter((c) => c.srs.state === 0).length,
+    mastery,
     bossReady: active.filter((c) => c.srs.state !== 0).length >= BOSS_MIN_CARDS,
   };
 }

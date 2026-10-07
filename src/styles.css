@@ -910,6 +910,190 @@ main {
   color: var(--muted);
 }
 
+/* Folders look like deck cards with a tab on top. */
+.folder-card {
+  position: relative;
+  margin-top: 10px;
+  border-top-left-radius: 8px;
+}
+.folder-card::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: -2px;
+  width: 92px;
+  height: 12px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-bottom: 0;
+  border-radius: 10px 14px 0 0;
+  transition: border-color 0.12s, background 0.12s;
+}
+.folder-card:hover::before,
+.folder-card.drop-target::before {
+  border-color: var(--accent);
+}
+
+/* ---------- drag and drop ---------- */
+
+body.is-dragging,
+body.is-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+body.is-dragging .deck-card:hover:not(.drop-target) {
+  transform: none;
+  border-color: var(--border);
+  box-shadow: var(--ledge);
+}
+.deck-card.dragging {
+  opacity: 0.35;
+}
+.deck-card.drop-target,
+.deck-card.drop-target::before {
+  background: var(--accent-soft);
+}
+.deck-card.drop-target {
+  transform: scale(1.04);
+  border-color: var(--accent);
+  box-shadow: 0 6px 0 var(--accent-soft-strong);
+}
+.drag-ghost {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  max-width: 260px;
+  padding: var(--s2) var(--s4) var(--s2) var(--s2);
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: var(--pill);
+  box-shadow: var(--overlay);
+  font-family: var(--display);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transform: translate(10px, 10px) rotate(-3deg);
+}
+.drag-ghost span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 18px;
+}
+.drag-hint {
+  align-self: center;
+}
+@media (max-width: 860px) {
+  .drag-hint {
+    display: none;
+  }
+}
+
+/* ---------- breadcrumbs & moving ---------- */
+
+.page-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s3);
+  margin-bottom: calc(-1 * var(--s4));
+}
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+.crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: 4px var(--s2);
+  background: none;
+  border: 2px solid transparent;
+  border-radius: var(--pill);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+button.crumb:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.crumb.current {
+  color: var(--text);
+  cursor: default;
+}
+.crumb.drop-target {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.crumb-sep {
+  color: var(--faint);
+}
+.move-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-top: var(--s3);
+}
+.move-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  background: none;
+  border: 2px solid transparent;
+  border-radius: var(--r);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.move-row:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.move-row:disabled {
+  cursor: default;
+  color: var(--muted);
+}
+.move-row .muted {
+  margin-left: auto;
+  font-weight: 500;
+}
+.move-emoji {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 18px;
+}
+
 .empty {
   display: flex;
   flex-direction: column;
@@ -1309,7 +1493,7 @@ main {
 }
 .gen-options {
   display: grid;
-  grid-template-columns: 1fr 1.4fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: var(--s3);
   margin-top: var(--s4);
 }

@@ -1,9 +1,11 @@
 import { localDay } from '../shared/game.ts';
+import { scopeQuery, type Scope } from './scope.ts';
 import type {
   AnswerInput,
   AnswerResult,
   Card,
   DeckSummary,
+  FolderSummary,
   Material,
   Profile,
   Reward,
@@ -45,6 +47,7 @@ export interface AppState {
   level: { level: number; into: number; needed: number; title: string };
   settings: Settings;
   decks: DeckSummary[];
+  folders: FolderSummary[];
   dueTotal: number;
   newTotal: number;
   todayXp: number;
@@ -68,6 +71,7 @@ export interface StudyData {
   pool: string[];
   ahead: boolean;
   deck: DeckSummary | null;
+  folder: FolderSummary | null;
 }
 
 export interface StatsData {
@@ -110,9 +114,12 @@ export const api = {
   health: () => req<{ ok: boolean; claude: string | null; dataDir: string }>('GET', '/api/health'),
   testClaude: () => req<{ message: string; durationMs: number; models: string[] }>('POST', '/api/claude/test'),
   state: () => req<AppState>('GET', '/api/state'),
-  createDeck: (d: { title: string; emoji?: string; description?: string }) => req<DeckSummary & { newAchievements: string[] }>('POST', '/api/decks', d),
+  createDeck: (d: { title: string; emoji?: string; description?: string; folderId?: string | null }) => req<DeckSummary & { newAchievements: string[] }>('POST', '/api/decks', d),
   deck: (id: string) => req<DeckDetail>('GET', `/api/decks/${id}`),
-  updateDeck: (id: string, d: Partial<{ title: string; emoji: string; description: string }>) => req<DeckSummary>('PATCH', `/api/decks/${id}`, d),
+  updateDeck: (id: string, d: Partial<{ title: string; emoji: string; description: string; folderId: string | null }>) => req<DeckSummary>('PATCH', `/api/decks/${id}`, d),
+  createFolder: (f: { title: string; emoji?: string; parentId?: string | null }) => req<FolderSummary>('POST', '/api/folders', f),
+  updateFolder: (id: string, f: Partial<{ title: string; emoji: string; parentId: string | null }>) => req<FolderSummary>('PATCH', `/api/folders/${id}`, f),
+  deleteFolder: (id: string) => req('DELETE', `/api/folders/${id}`),
   deleteDeck: (id: string) => req('DELETE', `/api/decks/${id}`),
   addCard: (deckId: string, c: CardFields) =>
     req<CardView>('POST', `/api/decks/${deckId}/cards`, c),
@@ -121,13 +128,13 @@ export const api = {
   resetCard: (id: string) => req<CardView>('POST', `/api/cards/${id}/reset`),
   deleteCard: (id: string) => req('DELETE', `/api/cards/${id}`),
   deleteMaterial: (id: string, withCards: boolean) => req('DELETE', `/api/materials/${id}${withCards ? '?cards=1' : ''}`),
-  generate: (b: { deckId?: string; source: SourceInput; count: number; focus?: string; level?: string; title?: string; style?: 'cards' | 'mcq' }) =>
+  generate: (b: { deckId?: string; source: SourceInput; focus?: string; level?: string; title?: string }) =>
     req<GenerateResult>('POST', '/api/generate', b),
   enhance: (deckId: string) => req<{ updated: number }>('POST', `/api/decks/${deckId}/enhance`),
   explain: (cardId: string, question?: string) => req<{ text: string }>('POST', '/api/explain', { cardId, question }),
   grade: (cardId: string, given: string) => req<{ correct: boolean; feedback: string }>('POST', '/api/grade', { cardId, given }),
-  study: (mode: StudyMode, deckId: string | null, opts: { ahead?: boolean } = {}) =>
-    req<StudyData>('GET', `/api/study?mode=${mode}${deckId ? `&deckId=${deckId}` : ''}${opts.ahead ? '&ahead=1' : ''}`),
+  study: (mode: StudyMode, scope: Scope, opts: { ahead?: boolean } = {}) =>
+    req<StudyData>('GET', `/api/study?mode=${mode}${scopeQuery(scope)}${opts.ahead ? '&ahead=1' : ''}`),
   answer: (answer: AnswerInput, mode: StudyMode, scheduled: boolean) =>
     req<AnswerResult & { card: CardView | null }>('POST', '/api/answer', { answer, mode, scheduled }),
   complete: (s: Omit<SessionComplete, 'day'>) => req<Reward>('POST', '/api/session/complete', s),

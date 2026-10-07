@@ -8,17 +8,18 @@ import { EmptyState, Spinner } from '../components/ui.tsx';
 import { confetti, floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { ComboMeter, Feedback, Hearts, PlayHeader, QuestionView, Results, buildQuestion, useSession, type AnswerOutcome } from './common.tsx';
+import { type Scope, scopeBackLabel, scopeHome } from '../scope.ts';
 
 const HIT = 100;
 
-export function Boss({ deckId }: { deckId: string | null }) {
+export function Boss({ scope }: { scope: Scope }) {
   const [run, setRun] = useState(0);
-  return <BossRun key={run} deckId={deckId} onRestart={() => setRun((r) => r + 1)} />;
+  return <BossRun key={run} scope={scope} onRestart={() => setRun((r) => r + 1)} />;
 }
 
-function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () => void }) {
+function BossRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) {
   const { showError } = useApp();
-  const session = useSession('boss', deckId, false);
+  const session = useSession('boss', scope, false);
   const [data, setData] = useState<StudyData | null>(null);
   const [queue, setQueue] = useState<CardView[]>([]);
   const [pos, setPos] = useState(0);
@@ -34,11 +35,11 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
   const bossRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const pending = useRef<Promise<unknown>[]>([]);
-  const boss = useMemo(() => bossFor(deckId ?? 'all', localDay()), [deckId]);
+  const boss = useMemo(() => bossFor(scope ?? 'all', localDay()), [scope]);
 
   useEffect(() => {
     api
-      .study('boss', deckId)
+      .study('boss', scope)
       .then((d) => {
         setData(d);
         setQueue(d.cards);
@@ -46,7 +47,7 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
         setMaxHp(d.cards.length * HIT);
       })
       .catch(showError);
-  }, [deckId, showError]);
+  }, [scope, showError]);
 
   const card = queue[pos];
   const question = useMemo(() => (card && data ? buildQuestion(card, data.pool) : null), [card, data, pos]);
@@ -109,8 +110,8 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
       <div className="play center">
         <EmptyState mood="sleepy" title="No cards to fight yet">
           <p className="muted">Add some cards and study them first, then come back.</p>
-          <button className="btn primary" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
-            {deckId ? 'Back to deck' : 'Home'}
+          <button className="btn primary" onClick={() => navigate(scopeHome(scope))}>
+            {scopeBackLabel(scope)}
           </button>
         </EmptyState>
       </div>
@@ -125,7 +126,7 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
             reward={reward}
             title={result === 'won' ? `⚔️ ${boss.name} defeated!` : `${boss.emoji} ${boss.name} wins this round`}
             subtitle={result === 'won' ? 'Your hardest cards just got a little easier.' : 'Review these cards and come back stronger.'}
-            deckId={deckId}
+            scope={scope}
             stats={[
               { label: 'Damage dealt', value: maxHp - hp },
               { label: 'Accuracy', value: session.tally.current.answers ? `${Math.round((session.tally.current.correct / session.tally.current.answers) * 100)}%` : '–' },
@@ -154,7 +155,7 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
             critical hits). You have {BOSS_HEARTS} hearts.
           </p>
           <div className="results-actions">
-            <button className="btn big" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+            <button className="btn big" onClick={() => navigate(scopeHome(scope))}>
               Flee
             </button>
             <button className="btn primary big" onClick={() => setIntro(false)}>
@@ -168,7 +169,7 @@ function BossRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
 
   return (
     <div className="play">
-      <PlayHeader onQuit={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+      <PlayHeader onQuit={() => navigate(scopeHome(scope))}>
         <div className="grow" />
         <div ref={playerRef}>
           <Hearts n={hearts} max={BOSS_HEARTS} />
