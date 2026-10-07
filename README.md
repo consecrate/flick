@@ -73,8 +73,32 @@ npm run app:build    # build Flick.app and a .dmg into src-tauri/target/release/
 - **Web link**: Claude fetches the page with `WebFetch`.
 - **Topic**: no material needed; Claude writes cards from its own knowledge.
 - **Import list**: Quizlet exports, Anki plain-text exports, CSV, `term - definition`. Instant, no AI. Then use **Make quiz options with Claude** to generate multiple-choice distractors.
-- Options: number of cards, focus, and level. Every card gets 3 plausible distractors and a short explanation.
+- **Paste MCQs**: bulk-import exam-style multiple-choice questions written by any AI chat. Copy Flick's prompt (it asks for questions that test understanding, with one named misconception behind each wrong option), paste the reply, and Flick checks it as you paste. Questions can have 2 to 10 options, a code block in any language (syntax-highlighted), a hint and an explanation. Instant, no Claude Code call.
+- **Style**: Claude can write short-answer **flashcards** or **multiple choice** questions (exam-style, with code when it fits).
+- Options: number of cards, focus, and level. Every flashcard gets 3 plausible distractors and a short explanation.
 - Each deck has a **Materials** tab listing every source and the cards made from it. Adding more material to a deck tells Claude to avoid duplicating existing cards.
+
+#### MCQ import format
+Each question starts with a `## ` title line. Everything else is optional except the options, and exactly one option is marked `[x]`. Flick shuffles options, so they must not refer to each other by letter.
+
+````markdown
+## Calling a subclass method
+In Java, what happens when you compile and run this program?
+
+```java
+Animal a = new Dog();
+a.fetch();
+```
+
+- [x] Compilation error
+- [ ] Prints Fetching
+- [ ] Throws an exception at run time
+
+Hint: The compiler only knows the declared type of `a`.
+Explanation: Java checks calls against the declared type, and `Animal` has no `fetch()`.
+````
+
+Flick also accepts lettered options (`A) ...`) with an `Answer: B` line, and a reply wrapped in one outer code fence. The parser is in `shared/mcq.ts`.
 
 ### Studying
 - **Quiz** (main mode): FSRS picks due cards first, then new cards up to your daily limit. New or shaky cards are asked as **multiple choice**. Once FSRS considers a card stable, it switches to **typed recall**. Missed cards come back once at the end of the session. You have 5 ❤️ per quiz, and can revive for coins.

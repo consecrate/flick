@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ACHIEVEMENTS, SHOP, addDays, checkAchievements, effectiveStreak, levelInfo, localDay, masteryTier, rollChest } from '../shared/game.ts';
 import { isValidModel, type Card, type Deck, type Material, type SessionComplete, type Settings, type AnswerRequest } from '../shared/types.ts';
+import { MAX_OPTIONS, normalizeLang, parseMcqs } from '../shared/mcq.ts';
 import { explainCard, generateCards, gradeAnswer, makeDistractors, parsePairs } from './ai.ts';
 import { ClaudeError, UPLOAD_DIR, callClaude, claudeVersion } from './claude.ts';
 import { DATA_DIR, db, replaceAll, save, uid, type Data } from './db.ts';
@@ -74,18 +75,42 @@ function createDeck(title: string, emoji = '📘', description = ''): Deck {
   return deck;
 }
 
-function addCard(deckId: string, c: { front: string; back: string; distractors?: string[]; explanation?: string }, materialId?: string): Card {
+type CardInput = Pick<Card, 'front' | 'back'> & Partial<Pick<Card, 'distractors' | 'explanation' | 'mcq' | 'title' | 'code' | 'codeLang' | 'hint'>>;
+
+function cleanDistractors(list: unknown[], back: string, max: number): string[] {
+  const seen = new Set([back.trim().toLowerCase()]);
+  const out: string[] = [];
+  for (const d of list.map((x) => String(x ?? '').trim())) {
+    if (!d || seen.has(d.toLowerCase())) continue;
+    seen.add(d.toLowerCase());
+    out.push(d);
+  }
+  return out.slice(0, max);
+}
+
+/** Copy the optional MCQ fields (title, code, hint) from a request body onto a card. */
+function applyExtras(card: Card, c: Partial<CardInput>) {
+  if (typeof c.mcq === 'boolean') card.mcq = c.mcq || undefined;
+  if (typeof c.title === 'string') card.title = c.title.trim() || undefined;
+  if (typeof c.code === 'string') card.code = c.code.replace(/^\n+|\s+$/g, '') || undefined;
+  if (typeof c.codeLang === 'string') card.codeLang = normalizeLang(c.codeLang);
+  if (!card.code) card.codeLang = undefined;
+  if (typeof c.hint === 'string') card.hint = c.hint.trim() || undefined;
+}
+
+function addCard(deckId: string, c: CardInput, materialId?: string): Card {
   const card: Card = {
     id: uid(),
     deckId,
     front: c.front.trim(),
     back: c.back.trim(),
-    distractors: (c.distractors ?? []).map((d) => d.trim()).filter((d) => d && d !== c.back.trim()).slice(0, 3),
+    distractors: cleanDistractors(c.distractors ?? [], c.back, c.mcq ? MAX_OPTIONS - 1 : 3),
     explanation: c.explanation?.trim() || undefined,
     materialId,
     createdAt: new Date().toISOString(),
     srs: newSrs(),
   };
+  applyExtras(card, c);
   db.cards.push(card);
   db.profile.stats.cardsCreated++;
   return card;
@@ -206,7 +231,8 @@ app.patch(
     if (typeof b.front === 'string' && b.front.trim()) card.front = b.front.trim();
     if (typeof b.back === 'string' && b.back.trim()) card.back = b.back.trim();
     if (typeof b.explanation === 'string') card.explanation = b.explanation.trim() || undefined;
-    if (Array.isArray(b.distractors)) card.distractors = b.distractors.map(String).map((s: string) => s.trim()).filter(Boolean).slice(0, 3);
+    applyExtras(card, b);
+    if (Array.isArray(b.distractors)) card.distractors = cleanDistractors(b.distractors, card.back, card.mcq ? MAX_OPTIONS - 1 : 3);
     if (typeof b.starred === 'boolean') card.starred = b.starred;
     if (typeof b.suspended === 'boolean') card.suspended = b.suspended;
     save();
@@ -263,7 +289,7 @@ app.post(
     const source = b.source ?? {};
     const count = Math.max(3, Math.min(60, Number(b.count) || 15));
     let deck = b.deckId ? findDeck(b.deckId) : null;
-    const existingFronts = deck ? db.cards.filter((c) => c.deckId === deck!.id).map((c) => c.front) : [];
+    const existingFronts = deck ? db.cards.filter((c) => c.deckId === deck!.id).map((c) => (c.title ? `${c.title}: ${c.front}` : c.front)) : [];
 
     // Plain term/definition lists import instantly without AI.
     if (source.type === 'pairs') {
@@ -275,6 +301,21 @@ app.post(
       mat.cardCount = added.length;
       save();
       res.json({ deck: summarizeDeck(deck.id), added: added.length, material: mat, needsDistractors: true, newAchievements: checkAchievements(db.profile) });
+      return;
+    }
+
+    // Multiple-choice questions written by a chatbot from Flick's prompt.
+    if (source.type === 'mcq') {
+      const { questions, errors } = parseMcqs(String(source.text ?? ''));
+      if (!questions.length) {
+        throw new HttpError(400, errors.length ? `None of the ${errors.length} questions could be read. ${errors[0].title}: ${errors[0].message}.` : 'No questions found. Each question must start with a "## " title line.');
+      }
+      deck ??= createDeck(String(b.title ?? '') || 'Imported questions', '🎯');
+      const mat = addMaterial(deck.id, 'mcq', `Imported questions (${questions.length})`, questions.slice(0, 3).map((q) => q.title || q.question).join(' · '));
+      const added = questions.map((q) => addCard(deck!.id, { ...q, front: q.question, back: q.answer, mcq: true }, mat.id));
+      mat.cardCount = added.length;
+      save();
+      res.json({ deck: summarizeDeck(deck.id), added: added.length, skipped: errors.length, material: mat, newAchievements: checkAchievements(db.profile) });
       return;
     }
 
@@ -326,6 +367,7 @@ app.post(
         focus: b.focus ? String(b.focus) : undefined,
         level: b.level ? String(b.level) : undefined,
         existingFronts,
+        style: b.style === 'mcq' ? 'mcq' : 'cards',
         model: db.settings.model,
         thinking: db.settings.thinking,
       });
@@ -354,7 +396,7 @@ app.post(
   '/api/decks/:id/enhance',
   wrap(async (req, res) => {
     const deck = findDeck(req.params.id as string);
-    const todo = db.cards.filter((c) => c.deckId === deck.id && c.distractors.length < 3);
+    const todo = db.cards.filter((c) => c.deckId === deck.id && !c.mcq && c.distractors.length < 3);
     let updated = 0;
     for (let i = 0; i < todo.length; i += 25) {
       const batch = todo.slice(i, i + 25);
@@ -380,6 +422,10 @@ app.post(
     const text = await explainCard({
       front: card.front,
       back: card.back,
+      title: card.title,
+      code: card.code,
+      codeLang: card.codeLang,
+      distractors: card.mcq ? card.distractors : undefined,
       explanation: card.explanation,
       question: req.body.question ? String(req.body.question) : undefined,
       deckTitle: deck.title,
@@ -423,11 +469,12 @@ app.get(
         ahead = true;
       }
     } else if (mode === 'boss') cards = bossQueue(deckId, 10);
-    else if (mode === 'match') cards = practiceQueue(deckId, 6);
+    // Match pairs short questions with answers, so code questions sit it out.
+    else if (mode === 'match') cards = practiceQueue(deckId, 6, (c) => !c.code && !c.mcq);
     else cards = practiceQueue(deckId, 200);
 
     // Pool of other answers in the deck, used to build MCQ options for cards without distractors.
-    const pool = [...new Set(deckCards(deckId).map((c) => c.back))].slice(0, 300);
+    const pool = [...new Set(deckCards(deckId).filter((c) => !c.mcq).map((c) => c.back))].slice(0, 300);
     const now = new Date();
     res.json({
       cards: cards.map((c) => ({ ...cardView(c, now), previews: mode === 'flashcards' ? preview(c.srs, db.settings, now) : undefined })),

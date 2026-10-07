@@ -3,6 +3,7 @@ import type { Reward } from '../../shared/types.ts';
 import { api, type CardView } from '../api.ts';
 import { navigate, useApp } from '../app-context.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
+import { CodeBlock, Inline, RichText } from '../components/Code.tsx';
 import { EmptyState, ProgressBar, Spinner } from '../components/ui.tsx';
 import { floatText } from '../fx.ts';
 import { sfx } from '../sound.ts';
@@ -162,7 +163,7 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
         {card.srs.state === 0 && <span className="chip new-chip">New card</span>}
       </div>
       <div
-        className={`flip-card ${flipped ? 'flipped' : ''}`}
+        className={`flip-card ${flipped ? 'flipped' : ''} ${card.code || card.mcq ? 'tall' : ''}`}
         onClick={() => {
           if (!flipped) {
             sfx.flip();
@@ -172,13 +173,17 @@ function FlashRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
       >
         <div className="flip-inner">
           <div className="flip-face front">
-            <div className="q-front">{card.front}</div>
+            {card.title && <span className="q-title">{card.title}</span>}
+            {card.mcq || card.code ? <RichText className="q-front" text={card.front} /> : <div className="q-front">{card.front}</div>}
+            {card.code && <CodeBlock code={card.code} lang={card.codeLang} compact />}
             <div className="muted small">Click or press Space to flip</div>
           </div>
           <div className="flip-face back">
-            <div className="muted small">{card.front}</div>
-            <div className="flip-answer">{card.back}</div>
-            {card.explanation && <p className="feedback-expl">{card.explanation}</p>}
+            <div className="muted small">{card.title ?? card.front}</div>
+            <div className="flip-answer">
+              <Inline text={card.back} />
+            </div>
+            {card.explanation && <RichText className="feedback-expl" text={card.explanation} />}
             <button
               className="btn ghost small"
               onClick={(e) => {

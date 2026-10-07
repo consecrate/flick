@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Reward } from '../../shared/types.ts';
 import { api, type CardView } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
-import { Spinner } from '../components/ui.tsx';
+import { EmptyState, Spinner } from '../components/ui.tsx';
 import { floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { PlayHeader, Results, useSession } from './common.tsx';
@@ -114,6 +114,19 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
     return (
       <div className="play center">
         <Spinner />
+      </div>
+    );
+  }
+
+  if (cards.length < 2) {
+    return (
+      <div className="play center">
+        <EmptyState mood="sleepy" title="Not enough pairs to match">
+          <p className="muted">Match uses short question-and-answer cards. Code and multiple-choice questions sit this game out.</p>
+          <button className="btn primary" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+            {deckId ? 'Back to deck' : 'Home'}
+          </button>
+        </EmptyState>
       </div>
     );
   }
