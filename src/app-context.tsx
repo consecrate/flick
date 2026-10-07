@@ -59,6 +59,11 @@ export function useAppState(): AppState {
   return state;
 }
 
+/** The hat Flicky wears, safe to call before state has loaded. */
+export function useEquippedHat(): string | null {
+  return useContext(AppContext)?.state?.profile.hat ?? null;
+}
+
 function applyTheme(themeId: string) {
   const item = SHOP.find((i) => i.id === themeId) ?? SHOP.find((i) => i.id === 'theme-midnight')!;
   const [bg, surface, accent, ink] = item.value as string[];
@@ -110,14 +115,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const announceAchievements = useCallback(
     (ids: string[]) => {
-      ids.forEach((id, i) => {
-        const a = ACHIEVEMENTS.find((x) => x.id === id);
-        if (!a) return;
+      const list = ids.map((id) => ACHIEVEMENTS.find((x) => x.id === id)).filter((a) => !!a);
+      // A big batch (say, after an update adds new tiers) gets one summary toast instead of a long queue.
+      const shown = list.length > 3 ? list.slice(0, 2) : list;
+      shown.forEach((a, i) => {
         setTimeout(() => {
           sfx.unlock();
-          toast({ icon: a.icon, title: `Achievement unlocked: ${a.name}`, body: a.desc, kind: 'achievement' });
+          toast({ icon: a.icon, title: `Achievement unlocked: ${a.name}`, body: `${a.desc} · 🪙 +${a.coins}`, kind: 'achievement' });
         }, i * 700);
       });
+      const rest = list.slice(shown.length);
+      if (rest.length) {
+        setTimeout(() => {
+          sfx.unlock();
+          toast({
+            icon: '🏆',
+            title: `${rest.length} more trophies unlocked`,
+            body: `🪙 +${rest.reduce((sum, a) => sum + a.coins, 0)}. See them all on the Trophies page.`,
+            kind: 'achievement',
+          });
+        }, shown.length * 700);
+      }
     },
     [toast],
   );

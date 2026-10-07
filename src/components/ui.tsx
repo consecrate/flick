@@ -107,6 +107,7 @@ export function TopBar() {
       </button>
       <nav className="nav">
         {link('/', '🏠', 'Decks')}
+        {link('/journey', '🗺️', 'Journey')}
         {link('/stats', '📊', 'Stats')}
         {link('/achievements', '🏆', 'Trophies')}
         {link('/shop', '🛍️', 'Shop')}
@@ -132,7 +133,7 @@ export function TopBar() {
             🚀 <b>2× XP</b>
           </span>
         )}
-        <button className="hud-avatar" onClick={() => navigate('/settings')} title={`${p.name} · Level ${s.level.level}`}>
+        <button className="hud-avatar" onClick={() => navigate('/journey')} title={`${p.name} · Level ${s.level.level}`}>
           <span className="avatar">{p.avatar}</span>
           <span className="hud-level">
             <span>

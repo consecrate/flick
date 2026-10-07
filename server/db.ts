@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { levelInfo } from '../shared/game.ts';
 import type { Card, Deck, Material, Profile, ReviewEntry, Settings } from '../shared/types.ts';
 
 export interface Data {
@@ -24,7 +25,9 @@ export function defaultProfile(): Profile {
     name: 'Learner',
     avatar: '⚡',
     theme: 'theme-midnight',
+    hat: null,
     xp: 0,
+    levelPaid: 1,
     coins: 50,
     hints: 5,
     streak: { current: 0, best: 0, lastDay: null, freezes: 1 },
@@ -51,6 +54,7 @@ export function defaultProfile(): Profile {
       chestsOpened: 0,
       appeals: 0,
       purchases: 0,
+      questsClaimed: 0,
     },
   };
 }
@@ -82,22 +86,24 @@ function emptyData(): Data {
   };
 }
 
+/** Fill in fields added in later versions, so old data files and backups keep working. */
+function normalize(raw: Partial<Data>): Data {
+  const base = emptyData();
+  const profile: Profile = {
+    ...base.profile,
+    ...raw.profile,
+    stats: { ...base.profile.stats, ...raw.profile?.stats },
+    streak: { ...base.profile.streak, ...raw.profile?.streak },
+  };
+  // Players from before level rewards existed keep their coins as they are:
+  // rewards start with their next level.
+  if (typeof raw.profile?.levelPaid !== 'number') profile.levelPaid = levelInfo(profile.xp).level;
+  return { ...base, ...raw, profile, settings: { ...base.settings, ...raw.settings } } as Data;
+}
+
 function load(): Data {
   try {
-    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8')) as Partial<Data>;
-    const base = emptyData();
-    // Merge so that fields added in later versions get defaults.
-    return {
-      ...base,
-      ...raw,
-      profile: {
-        ...base.profile,
-        ...raw.profile,
-        stats: { ...base.profile.stats, ...raw.profile?.stats },
-        streak: { ...base.profile.streak, ...raw.profile?.streak },
-      },
-      settings: { ...base.settings, ...raw.settings },
-    } as Data;
+    return normalize(JSON.parse(fs.readFileSync(FILE, 'utf8')) as Partial<Data>);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       const backup = `${FILE}.corrupt-${Date.now()}`;
@@ -142,7 +148,7 @@ export function flush() {
 
 /** Replace all data (used by backup restore). */
 export function replaceAll(next: Data) {
-  Object.assign(db, next);
+  Object.assign(db, normalize(next));
   flush();
 }
 

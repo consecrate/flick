@@ -52,6 +52,8 @@ export interface AppState {
   chestOpenedToday: boolean;
   streakAtRisk: boolean;
   doubleXpActive: boolean;
+  /** Cards at the Mastered tier, for the Mastery trophies. */
+  masteredCards: number;
 }
 
 export interface DeckDetail {
@@ -129,11 +131,11 @@ export const api = {
   answer: (answer: AnswerInput, mode: StudyMode, scheduled: boolean) =>
     req<AnswerResult & { card: CardView | null }>('POST', '/api/answer', { answer, mode, scheduled }),
   complete: (s: Omit<SessionComplete, 'day'>) => req<Reward>('POST', '/api/session/complete', s),
-  claimQuest: (id: string) => req<{ coins: number }>('POST', `/api/quests/${encodeURIComponent(id)}/claim`),
+  claimQuest: (id: string) => req<{ coins: number; newAchievements: string[] }>('POST', `/api/quests/${encodeURIComponent(id)}/claim`),
   openChest: () => req<{ coins: number; hints: number; freeze: boolean; newAchievements: string[] }>('POST', '/api/chest/open'),
   buy: (itemId: string) => req<{ ok: boolean; newAchievements: string[] }>('POST', '/api/shop/buy', { itemId }),
   spend: (what: 'hint' | 'revive') => req<{ hints: number; coins: number }>('POST', '/api/spend', { what }),
-  updateProfile: (p: { name?: string; theme?: string; avatar?: string }) => req('POST', '/api/profile', p),
+  updateProfile: (p: { name?: string; theme?: string; avatar?: string; hat?: string | null }) => req('POST', '/api/profile', p),
   updateSettings: (s: Partial<Settings>) => req<Settings>('PATCH', '/api/settings', s),
   stats: () => req<StatsData>('GET', '/api/stats'),
   importBackup: (data: unknown) => req('POST', '/api/import', data),

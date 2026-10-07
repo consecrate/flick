@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MEDALS, SHOP, localDay, medalFor, studyDaysByMonth } from '../../shared/game.ts';
 import { api } from '../api.ts';
 import { navigate, useApp, useAppState } from '../app-context.tsx';
 import { ImportModal } from '../components/ImportModal.tsx';
@@ -43,6 +44,7 @@ export function Home() {
       const r = await api.claimQuest(id);
       sfx.coin();
       toast({ title: `+${r.coins} coins`, kind: 'success' });
+      announceAchievements(r.newAchievements);
       await refresh();
     } catch (e) {
       showError(e);
@@ -100,6 +102,8 @@ export function Home() {
           </div>
         </div>
       </section>
+
+      <JourneyStrip />
 
       <section className="grid-2">
         <div className="panel">
@@ -211,5 +215,38 @@ function ArcadeTile({ icon, name, desc, onClick, disabled }: { icon: string; nam
       <span className="arcade-name">{name}</span>
       <span className="muted small">{disabled ? '🔒 Study a deck first' : desc}</span>
     </button>
+  );
+}
+
+/** One line on what is coming next: the next level reward and this month's medal. */
+function JourneyStrip() {
+  const s = useAppState();
+  const level = s.level.level;
+  const next = SHOP.filter((i) => i.price === 0 && i.unlockLevel && i.unlockLevel > level).sort((a, b) => a.unlockLevel! - b.unlockLevel!)[0];
+  const days = studyDaysByMonth(s.profile.dailyXp)[localDay().slice(0, 7)] ?? 0;
+  const medal = medalFor(days);
+  const nextMedal = [...MEDALS].reverse().find((m) => m.days > days);
+  return (
+    <a className="journey-strip" href="#/journey">
+      {next && (
+        <span>
+          <span className="journey-strip-icon">{next.icon}</span> <b>{next.name}</b> unlocks at level {next.unlockLevel}
+        </span>
+      )}
+      <span>
+        <span className="journey-strip-icon">{medal ? medal.icon : '🏅'}</span>{' '}
+        {nextMedal ? (
+          <>
+            <b className="num">
+              {days}/{nextMedal.days}
+            </b>{' '}
+            study days for {nextMedal.name.toLowerCase()} this month
+          </>
+        ) : (
+          <b>Gold medal this month!</b>
+        )}
+      </span>
+      <span className="journey-strip-go">Journey →</span>
+    </a>
   );
 }

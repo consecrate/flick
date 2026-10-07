@@ -126,7 +126,11 @@ export interface Profile {
   name: string;
   avatar: string;
   theme: string;
+  /** Shop id of the hat Flicky wears, or null. */
+  hat: string | null;
   xp: number;
+  /** Highest level whose level-up coins have been paid. */
+  levelPaid: number;
   coins: number;
   hints: number;
   streak: { current: number; best: number; lastDay: string | null; freezes: number };
@@ -155,6 +159,7 @@ export interface Profile {
     chestsOpened: number;
     appeals: number;
     purchases: number;
+    questsClaimed: number;
   };
 }
 
@@ -235,6 +240,12 @@ export interface Reward {
   coins: number;
   levelBefore: number;
   levelAfter: number;
+  /** Coins paid for the levels gained this session. */
+  levelCoins: number;
+  /** Shop ids of rewards unlocked by those levels. */
+  unlocks: string[];
+  /** The new rank, when a level-up reached one. */
+  rank: { title: string; icon: string } | null;
   streakBefore: number;
   streakAfter: number;
   newAchievements: string[];

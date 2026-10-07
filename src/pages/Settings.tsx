@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { SHOP } from '../../shared/game.ts';
+import { SHOP, ownsItem } from '../../shared/game.ts';
 import { MODEL_PRESETS, isValidModel, type ModelChoice, type Settings as SettingsT } from '../../shared/types.ts';
 import { api } from '../api.ts';
 import { useApp, useAppState } from '../app-context.tsx';
@@ -52,7 +52,7 @@ export function Settings() {
   };
 
   const st = s.settings;
-  const ownedAvatars = ['⚡', ...s.profile.owned.filter((id) => id.startsWith('avatar-')).map((id) => avatarOf(id))];
+  const ownedAvatars = ['⚡', ...SHOP.filter((i) => i.kind === 'avatar' && ownsItem(s.profile, i, s.level.level)).map((i) => String(i.value))];
 
   return (
     <div className="page narrow">
@@ -238,8 +238,4 @@ function ModelPicker({ label, value, onChange }: { label: string; value: ModelCh
       {custom && trimmed && !valid && <span className="bad-text small">Use only letters, digits, dots, dashes and underscores.</span>}
     </label>
   );
-}
-
-function avatarOf(id: string): string {
-  return String(SHOP.find((i) => i.id === id)?.value ?? '⚡');
 }

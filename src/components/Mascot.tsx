@@ -1,14 +1,28 @@
 // Flicky, the flashcard mascot. Drawn in the theme accent so it matches every theme.
 
 import { useEffect, useRef, useState } from 'react';
+import { useEquippedHat } from '../app-context.tsx';
 import { sfx } from '../sound.ts';
+import { Hat } from './Hats.tsx';
 
 export type Mood = 'happy' | 'sleepy' | 'sad' | 'wow';
 
-export function Mascot({ mood = 'happy', size = 120, className = '' }: { mood?: Mood; size?: number; className?: string }) {
+/** `hat` overrides the hat Flicky is wearing (null for none); by default it's the player's equipped hat. */
+export function Mascot({ mood = 'happy', size = 120, className = '', hat }: { mood?: Mood; size?: number; className?: string; hat?: string | null }) {
   const ink = 'var(--mascot-ink, #191f33)';
+  const equipped = useEquippedHat();
+  const wearing = hat === undefined ? equipped : hat;
+  // A hat needs headroom, so the drawing gets taller and keeps its width.
+  const top = wearing ? 28 : 0;
   return (
-    <svg className={`mascot ${className}`} width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Flicky the flashcard">
+    <svg
+      className={`mascot ${className}`}
+      width={size}
+      height={(size * (120 + top)) / 120}
+      viewBox={`0 ${-top} 120 ${120 + top}`}
+      role="img"
+      aria-label="Flicky the flashcard"
+    >
       <ellipse cx="60" cy="112" rx="30" ry="4" fill="var(--ink)" opacity="0.08" />
       {/* the card behind */}
       <rect x="22" y="18" width="62" height="80" rx="14" fill="var(--accent-soft-strong)" transform="rotate(-10 53 58)" />
@@ -39,6 +53,7 @@ export function Mascot({ mood = 'happy', size = 120, className = '' }: { mood?: 
         {mood === 'sleepy' && <path d="M59 72q5 3 10 0" stroke={ink} strokeWidth="3" fill="none" strokeLinecap="round" />}
         {mood === 'sad' && <path d="M57 75q7-6 14 0" stroke={ink} strokeWidth="3" fill="none" strokeLinecap="round" />}
         {mood === 'wow' && <ellipse cx="64" cy="73" rx="5" ry="6" fill={ink} />}
+        {wearing && <Hat id={wearing} />}
       </g>
       {mood === 'sleepy' && (
         <text x="96" y="22" fontFamily="var(--display)" fontWeight="700" fontSize="16" fill="var(--muted)">

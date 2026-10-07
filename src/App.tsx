@@ -5,6 +5,7 @@ import { sfx } from './sound.ts';
 import { Achievements } from './pages/Achievements.tsx';
 import { DeckPage } from './pages/Deck.tsx';
 import { Home } from './pages/Home.tsx';
+import { Journey } from './pages/Journey.tsx';
 import { Settings } from './pages/Settings.tsx';
 import { Shop } from './pages/Shop.tsx';
 import { Stats } from './pages/Stats.tsx';
@@ -64,6 +65,7 @@ function Routes() {
 
   let page;
   if (parts[0] === 'deck' && parts[1]) page = <DeckPage key={parts[1]} id={parts[1]} />;
+  else if (parts[0] === 'journey') page = <Journey />;
   else if (parts[0] === 'stats') page = <Stats />;
   else if (parts[0] === 'achievements') page = <Achievements />;
   else if (parts[0] === 'shop') page = <Shop />;
