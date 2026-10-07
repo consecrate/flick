@@ -611,7 +611,7 @@ app.post(
     const item = SHOP.find((i) => i.id === req.body.itemId);
     if (!item) throw new HttpError(404, 'Item not found');
     const p = db.profile;
-    const cosmetic = item.kind === 'theme' || item.kind === 'avatar' || item.kind === 'hat';
+    const cosmetic = item.kind === 'theme' || item.kind === 'avatar' || item.kind === 'hat' || item.kind === 'skin';
     const level = levelInfo(p.xp).level;
     if (item.price === 0) throw new HttpError(400, item.unlockLevel ? `This is a free reward at level ${item.unlockLevel}` : 'This one is free');
     if (cosmetic && p.owned.includes(item.id)) throw new HttpError(400, 'You already own this');
@@ -629,6 +629,7 @@ app.post(
       if (item.kind === 'theme') p.theme = item.id;
       if (item.kind === 'avatar') p.avatar = String(item.value);
       if (item.kind === 'hat') p.hat = item.id;
+      if (item.kind === 'skin') p.skin = item.id;
     }
     p.stats.purchases++;
     const newAchievements = checkAchievements(p);
@@ -676,6 +677,12 @@ app.post(
       const item = SHOP.find((i) => i.id === b.hat && i.kind === 'hat');
       if (!item || !ownsItem(p, item, level)) throw new HttpError(400, 'Hat not owned');
       p.hat = item.id;
+    }
+    if (b.skin === null) p.skin = null;
+    else if (typeof b.skin === 'string') {
+      const item = SHOP.find((i) => i.id === b.skin && i.kind === 'skin');
+      if (!item || !ownsItem(p, item, level)) throw new HttpError(400, 'Skin not owned');
+      p.skin = item.id;
     }
     save();
     res.json({ ok: true });

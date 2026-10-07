@@ -151,7 +151,7 @@ Scheduling uses [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs) w
 - **Daily streak** with 🧊 streak freezes that cover missed days automatically.
 - **Daily XP goal** (ring on the home screen). Reaching it unlocks a 🎁 **treasure chest** with coins, hints and sometimes a freeze.
 - **Daily quests**: 3 random quests per day with coin rewards.
-- **Coins**: 1 per 10 XP, plus quests and chests. Spend them in the **Shop** on streak freezes, hint packs, 🚀 Double XP (15 min), hats for Flicky, color themes and avatars. Pricier items go on sale at higher levels.
+- **Coins**: 1 per 10 XP, plus quests and chests. Spend them in the **Shop** on streak freezes, hint packs, 🚀 Double XP (15 min), hats and skins for Flicky, color themes (premium ones have a background pattern) and avatars. Pricier items go on sale at higher levels; the rarest skin costs 25,000 coins.
 - **Hints**: 50/50 for multiple choice, first-letter reveal for typed answers.
 - **87 tiered trophies** in 20 families (right answers, streaks up to 1,000 days, study days, medals, mastered cards, levels and more). Each tier pays coins, and the top tiers take years.
 - **Arcade**

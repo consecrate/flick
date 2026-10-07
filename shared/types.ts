@@ -139,6 +139,8 @@ export interface Profile {
   theme: string;
   /** Shop id of the hat Flicky wears, or null. */
   hat: string | null;
+  /** Shop id of Flicky's skin, or null for the theme colour. */
+  skin: string | null;
   xp: number;
   /** Highest level whose level-up coins have been paid. */
   levelPaid: number;

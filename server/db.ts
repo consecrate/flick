@@ -27,6 +27,7 @@ export function defaultProfile(): Profile {
     avatar: '⚡',
     theme: 'theme-midnight',
     hat: null,
+    skin: null,
     xp: 0,
     levelPaid: 1,
     coins: 50,

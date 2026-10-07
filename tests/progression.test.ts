@@ -110,3 +110,12 @@ describe('monthly medals', () => {
     expect(medalMonths(log, 'gold')).toBe(1);
   });
 });
+
+describe('skins and premium themes', () => {
+  it('has a drawing for every skin and a motif for every patterned theme', async () => {
+    const { SKINS } = await import('../src/components/Skins.tsx');
+    const { patternImage } = await import('../src/theme-patterns.ts');
+    for (const i of SHOP.filter((x) => x.kind === 'skin')) expect(SKINS[i.id], i.id).toBeDefined();
+    for (const i of SHOP.filter((x) => x.pattern)) expect(patternImage(i.pattern, '#000'), i.id).not.toBe('none');
+  });
+});

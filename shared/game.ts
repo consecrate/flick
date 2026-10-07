@@ -540,7 +540,7 @@ export function checkAchievements(p: Profile, ctx?: AchievementContext): string[
 
 // ---------- shop ----------
 
-export type ShopKind = 'consumable' | 'theme' | 'avatar' | 'hat' | 'boost';
+export type ShopKind = 'consumable' | 'theme' | 'avatar' | 'hat' | 'skin' | 'boost';
 
 export interface ShopItem {
   id: string;
@@ -557,6 +557,8 @@ export interface ShopItem {
    * can be bought only from this level on.
    */
   unlockLevel?: number;
+  /** Premium themes: a background motif drawn in the accent colour (see src/theme-patterns.ts). */
+  pattern?: string;
 }
 
 export const SHOP: ShopItem[] = [
@@ -622,6 +624,26 @@ export const SHOP: ShopItem[] = [
   { id: 'avatar-flamingo', kind: 'avatar', name: 'Flamingo', desc: 'Balanced on one leg, and one deck.', icon: '🦩', price: 700, value: '🦩', unlockLevel: 20 },
   { id: 'avatar-whale', kind: 'avatar', name: 'Whale', desc: 'A big brain for a big ocean.', icon: '🐳', price: 1200, value: '🐳', unlockLevel: 30 },
   { id: 'avatar-peacock', kind: 'avatar', name: 'Peacock', desc: 'Show off a little. You earned it.', icon: '🦚', price: 2500, value: '🦚', unlockLevel: 50 },
+
+  // Skins: Flicky's whole look. The premium goal for long-time savers.
+  { id: 'skin-panda', kind: 'skin', name: 'Panda Flicky', desc: 'Ears, eye patches, and a very calm review style.', icon: '🐼', price: 1500 },
+  { id: 'skin-watermelon', kind: 'skin', name: 'Watermelon', desc: 'Juicy pink with a crisp green rind.', icon: '🍉', price: 1800 },
+  { id: 'skin-tiger', kind: 'skin', name: 'Tiger', desc: 'Stripes, ears and a fierce streak.', icon: '🐯', price: 3000, unlockLevel: 10 },
+  { id: 'skin-ninja', kind: 'skin', name: 'Ninja', desc: 'A black hood and a red headband that flutters.', icon: '🥷', price: 4000, unlockLevel: 15 },
+  { id: 'skin-robot', kind: 'skin', name: 'Robo-Flicky', desc: 'Steel plates, an antenna and blinking lights.', icon: '🤖', price: 5000, unlockLevel: 20 },
+  { id: 'skin-pixel', kind: 'skin', name: '8-Bit', desc: 'Flicky in glorious pixel art.', icon: '👾', price: 6500, unlockLevel: 25 },
+  { id: 'skin-dragon', kind: 'skin', name: 'Dragon', desc: 'Horns, scales, a wing and a belly full of facts.', icon: '🐲', price: 9000, unlockLevel: 30 },
+  { id: 'skin-galaxy', kind: 'skin', name: 'Galaxy', desc: 'A starry night sky with its own little planet.', icon: '🪐', price: 12000, unlockLevel: 40 },
+  { id: 'skin-crystal', kind: 'skin', name: 'Crystal', desc: 'Cut like a gem, with ice-blue facets.', icon: '💎', price: 16000, unlockLevel: 50 },
+  { id: 'skin-gold', kind: 'skin', name: 'Solid Gold', desc: 'The rarest Flicky there is. Pure gold.', icon: '🏆', price: 25000, unlockLevel: 60 },
+
+  // Premium themes with a background motif.
+  { id: 'theme-graph', kind: 'theme', name: 'Graph Paper', desc: 'Blue ink on a fresh notebook grid.', icon: '📐', price: 2500, value: ['#f7f9fc', '#ffffff', '#2f6fde', '#16213a'], pattern: 'grid', unlockLevel: 10 },
+  { id: 'theme-sakura', kind: 'theme', name: 'Sakura', desc: 'Blush pink with drifting cherry blossoms.', icon: '🌸', price: 3500, value: ['#fff4f7', '#ffffff', '#e2557f', '#2e1620'], pattern: 'petals', unlockLevel: 15 },
+  { id: 'theme-waves', kind: 'theme', name: 'Tide Pool', desc: 'Cool aqua with rolling waves.', icon: '🌊', price: 4500, value: ['#eefafc', '#ffffff', '#0f9fb8', '#0f2a30'], pattern: 'waves', unlockLevel: 20 },
+  { id: 'theme-arcade', kind: 'theme', name: 'Arcade', desc: 'Deep purple, lime pixels, insert coin.', icon: '🕹️', price: 6000, value: ['#1a1030', '#251842', '#a3e635', '#f1ecff'], pattern: 'pixels', unlockLevel: 25 },
+  { id: 'theme-starfield', kind: 'theme', name: 'Starfield', desc: 'Midnight blue scattered with gold stars.', icon: '✨', price: 9000, value: ['#0e1430', '#18204a', '#ffcc33', '#eef1ff'], pattern: 'stars', unlockLevel: 35 },
+  { id: 'theme-midas', kind: 'theme', name: 'Midas', desc: 'Ivory and gold in a diamond weave. Only for the rich.', icon: '💰', price: 20000, value: ['#fffaf0', '#ffffff', '#c99a06', '#2a2108'], pattern: 'diamonds', unlockLevel: 50 },
 ];
 
 /** Whether the player can use a theme, avatar or hat at their current level. */
