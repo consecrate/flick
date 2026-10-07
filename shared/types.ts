@@ -71,6 +71,17 @@ export interface Deck {
   color: string;
   description: string;
   createdAt: string;
+  /** Folder the deck sits in. Missing or null means the top level. */
+  folderId?: string | null;
+}
+
+/** A folder of decks. Folders nest through `parentId` (null at the top level). */
+export interface Folder {
+  id: string;
+  title: string;
+  emoji: string;
+  parentId: string | null;
+  createdAt: string;
 }
 
 export type MaterialKind = 'text' | 'file' | 'url' | 'topic' | 'import' | 'mcq';
@@ -182,6 +193,18 @@ export interface DeckSummary extends Deck {
   /** 0-1 mastery across all cards. */
   mastery: number;
   materials: number;
+  bossReady: boolean;
+}
+
+export interface FolderSummary extends Folder {
+  /** Decks inside the folder and all its subfolders. */
+  deckCount: number;
+  folderCount: number;
+  cardCount: number;
+  dueCount: number;
+  newCount: number;
+  /** 0-1 mastery across every card inside. */
+  mastery: number;
   bossReady: boolean;
 }
 

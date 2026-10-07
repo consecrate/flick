@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MAX_OPTIONS } from '../../shared/mcq.ts';
 import { api, type CardView, type DeckDetail } from '../api.ts';
-import { navigate, useApp } from '../app-context.tsx';
+import { navigate, useApp, useAppState } from '../app-context.tsx';
 import { Inline } from '../components/Code.tsx';
+import { FolderCrumbs, MoveModal, deckItem } from '../components/DeckBrowser.tsx';
 import { ExplainModal } from '../components/ExplainModal.tsx';
 import { ImportModal } from '../components/ImportModal.tsx';
 import { Icon } from '../components/icons.tsx';
@@ -20,6 +21,8 @@ export function DeckPage({ id }: { id: string }) {
   const [query, setQuery] = useState('');
   const [enhancing, setEnhancing] = useState(false);
   const [editTitle, setEditTitle] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const s = useAppState();
 
   const load = useCallback(async () => {
     try {
@@ -85,7 +88,7 @@ export function DeckPage({ id }: { id: string }) {
     try {
       await api.deleteDeck(d.id);
       await refresh();
-      navigate('/');
+      navigate(s.folders.some((f) => f.id === d.folderId) ? `/folder/${d.folderId}` : '/');
     } catch (e) {
       showError(e);
     }
@@ -111,9 +114,12 @@ export function DeckPage({ id }: { id: string }) {
 
   return (
     <div className="page">
-      <button className="link back" onClick={() => navigate('/')}>
-        <Icon name="back" size={14} /> All decks
-      </button>
+      <div className="page-top">
+        <FolderCrumbs folderId={s.folders.some((f) => f.id === d.folderId) ? d.folderId! : null} />
+        <button className="btn small ghost" onClick={() => setMoving(true)}>
+          📁 Move to folder
+        </button>
+      </div>
       <section className="deck-hero">
         <div className="deck-hero-main">
           <details className="emoji-picker">
@@ -368,6 +374,7 @@ export function DeckPage({ id }: { id: string }) {
         />
       )}
       {explaining && <ExplainModal card={explaining} onClose={() => setExplaining(null)} />}
+      {moving && <MoveModal item={deckItem(d, s.folders)} onClose={() => setMoving(false)} onMoved={() => void load()} />}
     </div>
   );
 }

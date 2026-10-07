@@ -8,6 +8,7 @@ import { Mascot } from '../components/Mascot.tsx';
 import { EmptyState, ProgressBar, Spinner } from '../components/ui.tsx';
 import { shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
+import { type Scope, scopeHome } from '../scope.ts';
 import {
   ComboMeter,
   Feedback,
@@ -23,15 +24,15 @@ import {
 
 type Phase = 'loading' | 'empty' | 'question' | 'feedback' | 'gameover' | 'done';
 
-export function Quiz({ deckId }: { deckId: string | null }) {
+export function Quiz({ scope }: { scope: Scope }) {
   const [run, setRun] = useState(0);
-  return <QuizRun key={run} deckId={deckId} onRestart={() => setRun((r) => r + 1)} />;
+  return <QuizRun key={run} scope={scope} onRestart={() => setRun((r) => r + 1)} />;
 }
 
-function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () => void }) {
+function QuizRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) {
   const s = useAppState();
   const { showError, refresh } = useApp();
-  const session = useSession('quiz', deckId, true);
+  const session = useSession('quiz', scope, true);
   const [data, setData] = useState<StudyData | null>(null);
   const [queue, setQueue] = useState<CardView[]>([]);
   const [pos, setPos] = useState(0);
@@ -52,17 +53,17 @@ function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
     async (practiceAhead = false) => {
       setPhase('loading');
       try {
-        const d = await api.study('quiz', deckId, { ahead: practiceAhead });
+        const d = await api.study('quiz', scope, { ahead: practiceAhead });
         setData(d);
         setQueue(d.cards);
         setAhead(d.ahead);
         setPhase(d.cards.length ? 'question' : 'empty');
       } catch (e) {
         showError(e);
-        navigate(deckId ? `/deck/${deckId}` : '/');
+        navigate(scopeHome(scope));
       }
     },
-    [deckId, showError],
+    [scope, showError],
   );
 
   useEffect(() => {
@@ -169,7 +170,7 @@ function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
 
   const quit = async () => {
     if (session.tally.current.answers > 0) await finish();
-    else navigate(deckId ? `/deck/${deckId}` : '/');
+    else navigate(scopeHome(scope));
   };
 
   if (phase === 'loading') {
@@ -186,7 +187,7 @@ function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
         <EmptyState mood="sleepy" title="All caught up!">
           <p className="muted">FSRS says nothing is due right now. Coming back later is the most efficient way to remember.</p>
           <div className="row center-row">
-            <button className="btn" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+            <button className="btn" onClick={() => navigate(scopeHome(scope))}>
               Back
             </button>
             <button className="btn primary" onClick={() => void load(true)}>
@@ -207,7 +208,7 @@ function QuizRun({ deckId, onRestart }: { deckId: string | null; onRestart: () =
           reward={reward}
           title={t.correct === t.answers && t.answers >= 5 ? '💎 Flawless!' : 'Session complete!'}
           subtitle={ahead ? 'Practiced ahead of schedule.' : undefined}
-          deckId={deckId}
+          scope={scope}
           stats={[
             { label: 'Accuracy', value: t.answers ? `${Math.round((t.correct / t.answers) * 100)}%` : '–' },
             { label: 'Answered', value: t.answers },

@@ -46,7 +46,7 @@ function readBase64(file: File): Promise<string> {
   });
 }
 
-export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onClose: () => void; onDone: (r: GenerateResult) => void }) {
+export function ImportModal({ deckId, folderId, onClose, onDone }: { deckId?: string; folderId?: string | null; onClose: () => void; onDone: (r: GenerateResult) => void }) {
   const { showError, refresh, announceAchievements, toast } = useApp();
   const [tab, setTab] = useState<Tab>('files');
   const [text, setText] = useState('');
@@ -128,7 +128,7 @@ export function ImportModal({ deckId, onClose, onDone }: { deckId?: string; onCl
   const createEmpty = async () => {
     setBusy(true);
     try {
-      const d = await api.createDeck({ title });
+      const d = await api.createDeck({ title, folderId });
       sfx.unlock();
       await refresh();
       announceAchievements(d.newAchievements);

@@ -6,6 +6,7 @@ import { EmptyState, Spinner } from '../components/ui.tsx';
 import { floatText, shake } from '../fx.ts';
 import { sfx } from '../sound.ts';
 import { PlayHeader, Results, useSession } from './common.tsx';
+import { type Scope, scopeBackLabel, scopeHome } from '../scope.ts';
 
 interface Tile {
   key: string;
@@ -20,15 +21,15 @@ function fmt(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-export function Match({ deckId }: { deckId: string | null }) {
+export function Match({ scope }: { scope: Scope }) {
   const [run, setRun] = useState(0);
-  return <MatchRun key={run} deckId={deckId} onRestart={() => setRun((r) => r + 1)} />;
+  return <MatchRun key={run} scope={scope} onRestart={() => setRun((r) => r + 1)} />;
 }
 
-function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () => void }) {
+function MatchRun({ scope, onRestart }: { scope: Scope; onRestart: () => void }) {
   const s = useAppState();
   const { showError } = useApp();
-  const session = useSession('match', deckId, false);
+  const session = useSession('match', scope, false);
   const [cards, setCards] = useState<CardView[] | null>(null);
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [selected, setSelected] = useState<Tile | null>(null);
@@ -44,7 +45,7 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
 
   useEffect(() => {
     api
-      .study('match', deckId)
+      .study('match', scope)
       .then((d) => {
         setCards(d.cards);
         const t: Tile[] = d.cards.flatMap((c) => [
@@ -59,7 +60,7 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
         setStart(performance.now());
       })
       .catch(showError);
-  }, [deckId, showError]);
+  }, [scope, showError]);
 
   useEffect(() => {
     if (start === null || finalMs !== null) return;
@@ -123,8 +124,8 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
       <div className="play center">
         <EmptyState mood="sleepy" title="Not enough pairs to match">
           <p className="muted">Match uses short question-and-answer cards. Code and multiple-choice questions sit this game out.</p>
-          <button className="btn primary" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
-            {deckId ? 'Back to deck' : 'Home'}
+          <button className="btn primary" onClick={() => navigate(scopeHome(scope))}>
+            {scopeBackLabel(scope)}
           </button>
         </EmptyState>
       </div>
@@ -139,7 +140,7 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
           reward={reward}
           title={`🧩 Cleared in ${fmt(finalMs)}!`}
           subtitle={best !== null && !reward.newRecord ? `Personal best: ${fmt(best)}` : undefined}
-          deckId={deckId}
+          scope={scope}
           stats={[
             { label: 'Time', value: fmt(finalMs) },
             { label: 'Pairs', value: cards.length },
@@ -153,7 +154,7 @@ function MatchRun({ deckId, onRestart }: { deckId: string | null; onRestart: () 
 
   return (
     <div className="play wide">
-      <PlayHeader onQuit={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
+      <PlayHeader onQuit={() => navigate(scopeHome(scope))}>
         <div className="grow">
           <b>Match</b> <span className="muted small">Tap a question, then its answer. Wrong pairs add {PENALTY_MS / 1000}s.</span>
         </div>

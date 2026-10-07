@@ -9,6 +9,7 @@ import { CodeBlock, Inline, RichText } from '../components/Code.tsx';
 import { CountUp, Spinner } from '../components/ui.tsx';
 import { confetti, floatText } from '../fx.ts';
 import { sfx } from '../sound.ts';
+import { type Scope, scopeBackLabel, scopeDeckId, scopeHome } from '../scope.ts';
 
 // ---------- questions ----------
 
@@ -219,7 +220,7 @@ export function QuestionView({
 
 // ---------- session bookkeeping ----------
 
-export function useSession(mode: StudyMode, deckId: string | null, scheduled: boolean) {
+export function useSession(mode: StudyMode, scope: Scope, scheduled: boolean) {
   const s = useAppState();
   const { announceAchievements, toast, showError } = useApp();
   const [combo, setCombo] = useState(0);
@@ -262,7 +263,7 @@ export function useSession(mode: StudyMode, deckId: string | null, scheduled: bo
   const finish = async (extra: { bossDefeated?: boolean; timeAttackScore?: number; matchMs?: number } = {}): Promise<Reward | null> => {
     const t = tally.current;
     try {
-      const reward = await api.complete({ mode, deckId, answers: t.answers, correct: t.correct, maxCombo: t.maxCombo, sessionXp: t.xp, ...extra });
+      const reward = await api.complete({ mode, deckId: scopeDeckId(scope), answers: t.answers, correct: t.correct, maxCombo: t.maxCombo, sessionXp: t.xp, ...extra });
       announceAchievements(reward.newAchievements);
       return reward;
     } catch (e) {
@@ -413,7 +414,7 @@ export function Results({
   stats,
   onAgain,
   againLabel = 'Play again',
-  deckId,
+  scope,
 }: {
   reward: Reward | null;
   title: string;
@@ -421,7 +422,7 @@ export function Results({
   stats: { label: string; value: string | number }[];
   onAgain?: () => void;
   againLabel?: string;
-  deckId: string | null;
+  scope: Scope;
 }) {
   const { refresh } = useApp();
   const s = useAppState();
@@ -489,8 +490,8 @@ export function Results({
         </div>
       ))}
       <div className="results-actions">
-        <button className="btn big" onClick={() => navigate(deckId ? `/deck/${deckId}` : '/')}>
-          {deckId ? 'Back to deck' : 'Home'}
+        <button className="btn big" onClick={() => navigate(scopeHome(scope))}>
+          {scopeBackLabel(scope)}
         </button>
         {onAgain && (
           <button className="btn primary big" onClick={onAgain}>
