@@ -46,7 +46,7 @@ Data lives in `~/.flick/data.json` (override with `FLICK_DATA_DIR`). Export and 
 
 Flick also ships as a desktop app built with [Tauri](https://tauri.app). It runs the same UI and server as `npm start`: the server is compiled into a single binary with Bun and bundled inside the app, so the app needs no Node install. It still needs Claude Code installed and logged in.
 
-**Install.** Each push to `main` (and each pull request) builds `.dmg` files in GitHub Actions. Open the latest run of the **Desktop app** workflow, download `Flick-macOS-AppleSilicon` (M1 and later) or `Flick-macOS-Intel`, unzip it, open the `.dmg` and drag Flick to Applications.
+**Install.** Download `Flick-macOS-AppleSilicon.dmg` (M1 and later) or `Flick-macOS-Intel.dmg` from the [latest release](https://github.com/consecrate/flick/releases/latest), open it and drag Flick to Applications. Every push to `main` publishes a new release. Builds for pull requests are in the **Desktop app** workflow runs in GitHub Actions.
 
 **First launch.** The app is not signed with an Apple Developer ID yet, so macOS blocks it the first time. Run this once in Terminal, then open Flick normally:
 
@@ -57,6 +57,21 @@ xattr -dr com.apple.quarantine /Applications/Flick.app
 (Alternatively: try to open it, then go to System Settings → Privacy & Security and click **Open Anyway**.)
 
 The app uses the same data as the web version (`~/.flick`). It finds the `claude` CLI through your login shell's `PATH`, so if `claude` works in Terminal it works in the app.
+
+**Auto-updates.** The app checks for a new release at launch and every 6 hours. When one exists it asks whether to update; on yes it downloads the new version, replaces itself and restarts. Updates are signed with a key that only the release workflow has, and the app rejects an update with a bad signature.
+
+One-time setup for the repository owner, on your Mac:
+
+```bash
+npx tauri signer generate --ci -w ~/.tauri/flick.key   # makes flick.key and flick.key.pub (no password)
+```
+
+Then add two repository secrets under GitHub → Settings → Secrets and variables → Actions → New repository secret:
+
+- `TAURI_SIGNING_PRIVATE_KEY`: the contents of `~/.tauri/flick.key`
+- `TAURI_UPDATER_PUBKEY`: the contents of `~/.tauri/flick.key.pub`
+
+Or, with the GitHub CLI: `gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/flick.key` and `gh secret set TAURI_UPDATER_PUBKEY < ~/.tauri/flick.key.pub`. Keep `flick.key` private and backed up: if it is lost, installed apps can't accept updates signed with a new key and need one manual reinstall. Without these secrets, the workflow still builds `.dmg` files but publishes no release.
 
 **Building locally** (on a Mac, with Rust and Bun installed):
 
